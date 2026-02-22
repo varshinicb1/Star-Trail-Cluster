@@ -1,0 +1,32 @@
+{
+    "name": "cst816d",
+    "version": "0.1.0",
+    "description": "An Arduino library for the cst816d capacitive touchscreen IC.",
+    "keywords": "cst816d, touchscreen",
+    "repository":
+    {
+      "type": "git",
+      "url": "https://github.com/max22-/cst816d.git"
+    },
+    "authors":
+    [
+      {
+        "name": "Maxime ANDRÉ",
+        "email": "maxime.andre1986@gmail.com",
+        "url": "https://github.com/max22-/"
+      }
+    ],
+    "license": "MIT",
+    "homepage": "https://github.com/max22-/cst816d",
+    "dependencies": {
+    },
+    "frameworks": ["arduino"],
+    "platforms": "*",
+    "examples": [
+        {
+            "name": "01-Waveshare-RP2350-Touch-LCD-2",
+            "base": "examples/01-Waveshare-RP2350-Touch-LCD-2",
+            "files": ["01-Waveshare-RP2350-Touch-LCD-2"]
+        }
+    ]
+  }

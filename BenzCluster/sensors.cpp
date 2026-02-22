@@ -7,16 +7,29 @@
 // ============== MPU9250 Registers ==============
 #define MPU9250_WHO_AM_I 0x75
 #define MPU9250_PWR_MGMT_1 0x6B
+#define MPU9250_PWR_MGMT_2 0x6C
 #define MPU9250_INT_PIN_CFG 0x37
 #define MPU9250_ACCEL_XOUT 0x3B
 #define MPU9250_GYRO_XOUT 0x43
+#define MPU9250_USER_CTRL 0x6A
+#define MPU9250_I2C_MST_CTRL 0x24
+#define MPU9250_I2C_SLV0_ADDR 0x25
+#define MPU9250_I2C_SLV0_REG 0x26
+#define MPU9250_I2C_SLV0_CTRL 0x27
+#define MPU9250_I2C_SLV4_ADDR 0x31
+#define MPU9250_I2C_SLV4_REG 0x32
+#define MPU9250_I2C_SLV4_DO 0x33
+#define MPU9250_I2C_SLV4_CTRL 0x34
+#define MPU9250_I2C_SLV4_DI 0x35
+#define MPU9250_I2C_MST_STATUS 0x36
+#define MPU9250_EXT_SENS_DATA_00 0x49
 
-// AK8963 Magnetometer (inside MPU9250)
-#define AK8963_ADDR 0x0C
-#define AK8963_WHO_AM_I 0x00
-#define AK8963_CNTL1 0x0A
-#define AK8963_ST1 0x02
-#define AK8963_HXL 0x03
+// QMC5883L registers
+#define QMC5883L_ADDR 0x0D
+#define QMC5883L_DATA_REG 0x00
+#define QMC5883L_STATUS_REG 0x06
+#define QMC5883L_CTRL1_REG 0x09
+#define QMC5883L_SETRESET_REG 0x0B
 
 // ============== BME280 Registers ==============
 #define BME280_CHIP_ID 0xD0
@@ -85,7 +98,39 @@ static void readBytes(uint8_t addr, uint8_t reg, uint8_t count, uint8_t *dest) {
 
 // ============== MPU9250 Functions ==============
 static bool mag_found = false;
-static uint8_t mag_addr = AK8963_ADDR; // Will be updated if found elsewhere
+static uint8_t mag_addr = QMC5883L_ADDR; // Will be updated if found elsewhere
+
+// ============== I2C Master Helpers ==============
+// Write a single byte to an external I2C slave via MPU9250 SLV4 (single-shot)
+static bool mpu_slv4_write(uint8_t slaveAddr, uint8_t reg, uint8_t data) {
+  writeByte(MPU9250_ADDR, MPU9250_I2C_SLV4_ADDR, slaveAddr); // Write mode
+  writeByte(MPU9250_ADDR, MPU9250_I2C_SLV4_REG, reg);
+  writeByte(MPU9250_ADDR, MPU9250_I2C_SLV4_DO, data);
+  writeByte(MPU9250_ADDR, MPU9250_I2C_SLV4_CTRL, 0x80); // Enable SLV4
+  delay(20);
+  uint8_t status = readByte(MPU9250_ADDR, MPU9250_I2C_MST_STATUS);
+  if (status & 0x10) { // SLV4_NACK
+    Serial.printf("[I2C_MST] SLV4 NACK writing 0x%02X=0x%02X to 0x%02X\n", reg,
+                  data, slaveAddr);
+    return false;
+  }
+  Serial.printf("[I2C_MST] SLV4 wrote 0x%02X=0x%02X to 0x%02X OK\n", reg, data,
+                slaveAddr);
+  return true;
+}
+
+// Read a single byte from an external I2C slave via MPU9250 SLV4 (single-shot)
+static uint8_t mpu_slv4_read(uint8_t slaveAddr, uint8_t reg) {
+  writeByte(MPU9250_ADDR, MPU9250_I2C_SLV4_ADDR, slaveAddr | 0x80); // Read mode
+  writeByte(MPU9250_ADDR, MPU9250_I2C_SLV4_REG, reg);
+  writeByte(MPU9250_ADDR, MPU9250_I2C_SLV4_CTRL, 0x80); // Enable SLV4
+  delay(20);
+  uint8_t status = readByte(MPU9250_ADDR, MPU9250_I2C_MST_STATUS);
+  if (status & 0x10) { // SLV4_NACK
+    return 0x00;
+  }
+  return readByte(MPU9250_ADDR, MPU9250_I2C_SLV4_DI);
+}
 
 static bool initMPU9250() {
   // Check WHO_AM_I - accept many variants
@@ -93,7 +138,6 @@ static bool initMPU9250() {
   Serial.printf("[IMU] WHO_AM_I at 0x68: 0x%02X\n", whoami);
 
   if (whoami == 0x00 || whoami == 0xFF) {
-    // Try alternate address 0x69
     whoami = readByte(0x69, MPU9250_WHO_AM_I);
     Serial.printf("[IMU] WHO_AM_I at 0x69: 0x%02X\n", whoami);
   }
@@ -106,87 +150,62 @@ static bool initMPU9250() {
   Serial.printf("[IMU] Found! (WHO_AM_I: 0x%02X)\n", whoami);
 
   // Full reset
-  writeByte(MPU9250_ADDR, MPU9250_PWR_MGMT_1, 0x80); // Reset device
+  writeByte(MPU9250_ADDR, MPU9250_PWR_MGMT_1, 0x80);
   delay(100);
 
   // Wake up - auto select best clock
   writeByte(MPU9250_ADDR, MPU9250_PWR_MGMT_1, 0x01);
   delay(100);
 
-  // Enable I2C bypass mode (VERY aggressive - multiple attempts)
-  // Method 1: Standard bypass
-  writeByte(MPU9250_ADDR, 0x6A, 0x00); // Disable I2C master mode
+  // Configure gyro: ±250dps, DLPF 41Hz
+  writeByte(MPU9250_ADDR, 0x1B, 0x00); // GYRO_CONFIG: ±250dps
+  writeByte(MPU9250_ADDR, 0x1A, 0x03); // CONFIG: DLPF_CFG=3 (41Hz)
+
+  // Configure accel: ±2g, DLPF 41Hz
+  writeByte(MPU9250_ADDR, 0x1C, 0x00); // ACCEL_CONFIG: ±2g
+  writeByte(MPU9250_ADDR, 0x1D, 0x03); // ACCEL_CONFIG2: DLPF 41Hz
+
+  // Disable I2C master mode (keep QMC5883L accessible on main bus)
+  writeByte(MPU9250_ADDR, MPU9250_USER_CTRL, 0x00);   // No I2C master
+  writeByte(MPU9250_ADDR, MPU9250_INT_PIN_CFG, 0x20); // LATCH_INT_EN only
   delay(10);
-  writeByte(MPU9250_ADDR, MPU9250_INT_PIN_CFG,
-            0x22); // BYPASS_EN + LATCH_INT_EN
-  delay(50);
 
-  // Now scan I2C bus to see what appeared after bypass mode
-  Serial.println("[IMU] Scanning I2C after bypass enable...");
-  for (uint8_t addr = 0x01; addr < 0x7F; addr++) {
-    Wire.beginTransmission(addr);
-    uint8_t err = Wire.endTransmission();
-    if (err == 0) {
-      Serial.printf("[IMU]   Post-bypass: 0x%02X found\n", addr);
+  Serial.println("[IMU] Configured (no I2C master, QMC5883L on main bus)");
+
+  // === Detect QMC5883L directly on the main I2C bus ===
+  Wire.beginTransmission(QMC5883L_ADDR);
+  uint8_t err = Wire.endTransmission();
+  if (err == 0) {
+    uint8_t chipId = readByte(QMC5883L_ADDR, 0x0D); // Chip ID register
+    Serial.printf("[MAG] QMC5883L detected at 0x0D (chip ID: 0x%02X)\n",
+                  chipId);
+
+    qmc5883l_found = true;
+    mag_found = true;
+    mag_addr = QMC5883L_ADDR;
+
+    // Configure QMC5883L: soft reset first
+    writeByte(QMC5883L_ADDR, 0x0A, 0x80); // Soft reset
+    delay(50);
+    writeByte(QMC5883L_ADDR, QMC5883L_SETRESET_REG, 0x01); // SET/RESET period
+    delay(10);
+    writeByte(QMC5883L_ADDR, QMC5883L_CTRL1_REG,
+              0x01); // Continuous, 10Hz, 2G, OSR512
+    delay(50);
+
+    // Verify config
+    uint8_t r09 = readByte(QMC5883L_ADDR, QMC5883L_CTRL1_REG);
+    Serial.printf("[MAG] QMC5883L R09 readback: 0x%02X (expected 0x01)\n", r09);
+
+    if (r09 == 0x01) {
+      Serial.println("[MAG] QMC5883L configured! Continuous mode active.");
+    } else {
+      Serial.println(
+          "[MAG] QMC5883L config write may have failed. Reading data anyway.");
     }
-  }
-
-  // Try to find magnetometer at multiple addresses
-  uint8_t mag_addrs[] = {0x0C, 0x0D, 0x0E, 0x0F};
-  for (int i = 0; i < 4; i++) {
-    uint8_t akId = readByte(mag_addrs[i], 0x00); // WHO_AM_I register
-    Serial.printf("[MAG] Check 0x%02X -> WHO_AM_I: 0x%02X\n", mag_addrs[i],
-                  akId);
-    if (akId == 0x48) { // AK8963
-      Serial.printf("[MAG] AK8963 found at 0x%02X!\n", mag_addrs[i]);
-      mag_addr = mag_addrs[i];
-      mag_found = true;
-
-      writeByte(mag_addr, AK8963_CNTL1, 0x00); // Power down
-      delay(10);
-      writeByte(mag_addr, AK8963_CNTL1,
-                0x16); // 16-bit, 100Hz continuous mode 2
-      delay(10);
-      break;
-    }
-    // Check for QMC5883L at 0x0D
-    if (mag_addrs[i] == 0x0D) {
-      Wire.beginTransmission(0x0D);
-      uint8_t err = Wire.endTransmission();
-      if (err == 0) {
-        // QMC5883L found! Init it
-        Serial.println("[MAG] QMC5883L detected at 0x0D!");
-        writeByte(0x0D, 0x0B, 0x01); // SET/RESET period
-        writeByte(0x0D, 0x09, 0x1D); // Continuous, 200Hz, 8G, OSR512
-        delay(10);
-        mag_addr = 0x0D;
-        mag_found = true;
-        qmc5883l_found = true;
-        break;
-      }
-    }
-  }
-
-  if (!mag_found) {
-    Serial.println("[MAG] No magnetometer found on any address");
+  } else {
+    Serial.printf("[MAG] QMC5883L not found at 0x0D (err=%d)\n", err);
     Serial.println("[MAG] Heading will use gyro integration (drift expected)");
-
-    // Full register dump from IMU to search for hidden magnetometer data
-    Serial.println("[REG] Dumping ALL registers from 0x68:");
-    Serial.print("[REG]     ");
-    for (int c = 0; c < 16; c++)
-      Serial.printf(" %02X", c);
-    Serial.println();
-    for (int row = 0; row < 8; row++) {
-      Serial.printf("[REG] %02X: ", row * 16);
-      for (int col = 0; col < 16; col++) {
-        uint8_t reg = row * 16 + col;
-        uint8_t val = readByte(MPU9250_ADDR, reg);
-        Serial.printf(" %02X", val);
-      }
-      Serial.println();
-    }
-    Serial.println("[REG] Register dump complete");
   }
 
   return true;
@@ -344,98 +363,66 @@ static void readMPU9250() {
 }
 
 static void readMagnetometer() {
-  if (!mag_found) {
-    // Gyro-based heading integration (drifts but works without mag)
-    static unsigned long lastGyroTime = 0;
-    unsigned long now = millis();
-    if (lastGyroTime > 0) {
-      float dt = (now - lastGyroTime) / 1000.0f;
-      heading += gyroZ * dt;
-      if (heading < 0)
-        heading += 360;
-      if (heading >= 360)
-        heading -= 360;
-    }
-    lastGyroTime = now;
-    return;
+  // Always run gyro yaw integration for heading baseline
+  static unsigned long lastGyroTime = 0;
+  unsigned long now = millis();
+  if (lastGyroTime > 0) {
+    float dt = (now - lastGyroTime) / 1000.0f;
+    heading += gyroZ * dt;
+    if (heading < 0)
+      heading += 360;
+    if (heading >= 360)
+      heading -= 360;
   }
+  lastGyroTime = now;
 
-  if (qmc5883l_found) {
-    // QMC5883L: read 6 bytes from register 0x00
-    uint8_t status = readByte(0x0D, 0x06);
-    if (status & 0x01) { // DRDY
-      uint8_t rawData[6];
-      readBytes(0x0D, 0x00, 6, rawData);
-      magRawX = (int16_t)((rawData[1] << 8) | rawData[0]);
-      magRawY = (int16_t)((rawData[3] << 8) | rawData[2]);
-      magRawZ = (int16_t)((rawData[5] << 8) | rawData[4]);
-
-      magX = (magRawX - magOffsetX) * magScaleX;
-      magY = (magRawY - magOffsetY) * magScaleY;
-      magZ = (magRawZ - magOffsetZ) * magScaleZ;
-
-      // Tilt-compensated heading using accelerometer
-      float cosRoll = cos(roll * DEG_TO_RAD);
-      float sinRoll = sin(roll * DEG_TO_RAD);
-      float cosPitch = cos(pitch * DEG_TO_RAD);
-      float sinPitch = sin(pitch * DEG_TO_RAD);
-      float Xh = magX * cosPitch + magZ * sinPitch;
-      float Yh = magX * sinRoll * sinPitch + magY * cosRoll -
-                 magZ * sinRoll * cosPitch;
-      float rawHeading = atan2(-Yh, Xh) * RAD_TO_DEG;
-      if (rawHeading < 0)
-        rawHeading += 360;
-      // Smooth
-      float diff = rawHeading - heading;
-      if (diff > 180)
-        diff -= 360;
-      if (diff < -180)
-        diff += 360;
-      heading += diff * 0.1f;
-      if (heading < 0)
-        heading += 360;
-      if (heading >= 360)
-        heading -= 360;
-    }
+  if (!mag_found)
     return;
-  }
 
-  // AK8963 path
-  if (readByte(mag_addr, AK8963_ST1) & 0x01) {
-    uint8_t rawData[7];
-    readBytes(mag_addr, AK8963_HXL, 7, rawData);
+  // Read QMC5883L directly from main I2C bus
+  uint8_t rawData[6];
+  readBytes(QMC5883L_ADDR, QMC5883L_DATA_REG, 6, rawData);
 
-    if (!(rawData[6] & 0x08)) {
-      magRawX = (rawData[1] << 8) | rawData[0];
-      magRawY = (rawData[3] << 8) | rawData[2];
-      magRawZ = (rawData[5] << 8) | rawData[4];
+  // QMC5883L: Little-endian (LSB first)
+  int16_t rx = (int16_t)((rawData[1] << 8) | rawData[0]);
+  int16_t ry = (int16_t)((rawData[3] << 8) | rawData[2]);
+  int16_t rz = (int16_t)((rawData[5] << 8) | rawData[4]);
 
-      magX = (magRawX - magOffsetX) * magScaleX;
-      magY = (magRawY - magOffsetY) * magScaleY;
-      magZ = (magRawZ - magOffsetZ) * magScaleZ;
+  if (rx != 0 || ry != 0 || rz != 0) {
+    magRawX = rx;
+    magRawY = ry;
+    magRawZ = rz;
+    magX = (magRawX - magOffsetX) * magScaleX;
+    magY = (magRawY - magOffsetY) * magScaleY;
+    magZ = (magRawZ - magOffsetZ) * magScaleZ;
 
-      float rawHeading = atan2(magY, magX) * RAD_TO_DEG;
-      rawHeading += MAGNETIC_DECLINATION;
+    // Tilt-compensated heading
+    float cosRoll = cos(roll * DEG_TO_RAD);
+    float sinRoll = sin(roll * DEG_TO_RAD);
+    float cosPitch = cos(pitch * DEG_TO_RAD);
+    float sinPitch = sin(pitch * DEG_TO_RAD);
+    float Xh = magX * cosPitch + magZ * sinPitch;
+    float Yh =
+        magX * sinRoll * sinPitch + magY * cosRoll - magZ * sinRoll * cosPitch;
+    float rawHeading = atan2(-Yh, Xh) * RAD_TO_DEG;
+    rawHeading += MAGNETIC_DECLINATION;
+    if (rawHeading < 0)
+      rawHeading += 360;
+    if (rawHeading >= 360)
+      rawHeading -= 360;
 
-      // Normalize to 0-360
-      if (rawHeading < 0)
-        rawHeading += 360.0f;
-      if (rawHeading >= 360)
-        rawHeading -= 360.0f;
-
-      // Low-pass filter with wrap-around handling
-      float diff = rawHeading - headingFiltered;
-      if (diff > 180)
-        diff -= 360;
-      if (diff < -180)
-        diff += 360;
-      headingFiltered += diff * ALPHA;
-      if (headingFiltered < 0)
-        headingFiltered += 360;
-      if (headingFiltered >= 360)
-        headingFiltered -= 360;
-      heading = headingFiltered;
-    }
+    // Smooth with wrap-around
+    float diff = rawHeading - headingFiltered;
+    if (diff > 180)
+      diff -= 360;
+    if (diff < -180)
+      diff += 360;
+    headingFiltered += diff * ALPHA;
+    if (headingFiltered < 0)
+      headingFiltered += 360;
+    if (headingFiltered >= 360)
+      headingFiltered -= 360;
+    heading = headingFiltered;
   }
 }
 
@@ -579,25 +566,21 @@ bool sensors_init() {
 
   mpu9250_found = initMPU9250();
 
-  // Try BME280 on primary address 0x76
+  // BME280 is on the same I2C bus — no bypass, no bus corruption
+  // Try at default address 0x76, then 0x77
   bme280_found = initBME280();
-
-  // If not found at 0x76, try alternate address 0x77
   if (!bme280_found) {
-    Serial.println("[BME280] Trying alternate address 0x77...");
-    // Temporarily override the address define is tricky, so just do inline
-    // check
     uint8_t chipId77 = readByte(0x77, BME280_CHIP_ID);
-    Serial.printf("[BME280] 0x77 Chip ID: 0x%02X\n", chipId77);
     if (chipId77 == 0x60 || chipId77 == 0x58) {
-      Serial.println("[BME280] Found at 0x77! (Not supported yet - update "
-                     "BME280_ADDR in config.h)");
+      Serial.printf("[BME280] Found at 0x77 (ID: 0x%02X)\n", chipId77);
     }
   }
 
   Serial.println("========================================");
-  Serial.printf("[SENSORS] MPU9250: %s\n", mpu9250_found ? "OK" : "NOT FOUND");
-  Serial.printf("[SENSORS] BME280:  %s\n", bme280_found ? "OK" : "NOT FOUND");
+  Serial.printf("[SENSORS] MPU9250:  %s\n", mpu9250_found ? "OK" : "NOT FOUND");
+  Serial.printf("[SENSORS] MAG:      %s (%s)\n", mag_found ? "OK" : "NOT FOUND",
+                qmc5883l_found ? "QMC5883L" : "AK8963");
+  Serial.printf("[SENSORS] BME280:   %s\n", bme280_found ? "OK" : "NOT FOUND");
   Serial.println("========================================");
 
   if (!mpu9250_found && !bme280_found) {
@@ -611,6 +594,7 @@ void sensors_update() {
   if (mpu9250_found) {
     readMPU9250();
     readMagnetometer();
+    // Heading smoothing applied in readMagnetometer()
   } else {
     // Simulated demo values
     static float simHeading = 0;

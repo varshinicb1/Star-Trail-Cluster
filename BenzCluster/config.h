@@ -31,12 +31,12 @@
 
 // ============== Sensor Addresses ==============
 #define MPU9250_ADDR 0x68
-#define AK8963_ADDR 0x0C // Magnetometer inside MPU9250
+#define QMC5883L_ADDR 0x0D // External magnetometer via MPU I2C master
 #define BME280_ADDR 0x76
 
 // ============== Location Config ==============
 // Bangalore, India
-#define MAGNETIC_DECLINATION -1.08f // -1°5' West in decimal degrees
+#define MAGNETIC_DECLINATION -1.09f // Bangalore: -1°5' West
 
 // Approximate sea level pressure (hPa) - will be updated via API
 #define DEFAULT_SEA_LEVEL_PRESSURE 1013.25f
@@ -66,8 +66,5 @@
 // ============== Calibration ==============
 #define CALIBRATION_FILE "/calibration/mag.json"
 #define PRESSURE_FILE "/calibration/pressure.json"
-
-// ============== User Personalization ==============
-#define WELCOME_NAME "DR"
 
 #endif // CONFIG_H

@@ -25,10 +25,10 @@ static lv_obj_t *pitchLabelsR[NUM_PITCH_LINES];
 static lv_obj_t *rollTicks[NUM_ROLL_TICKS]; // tick marks around arc
 static lv_obj_t *rollPointer = NULL;        // roll pointer triangle at top
 
-#define CX 100
-#define CY 100
-#define CR 95
-#define SAFE_R 90 // keep elements inside this radius
+#define CX 120
+#define CY 120
+#define CR 115
+#define SAFE_R 110 // keep elements inside this radius
 
 static float lastPitch = -999, lastRoll = -999;
 

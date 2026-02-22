@@ -1,0 +1,263 @@
+Processing gitmate (platform: espressif32@6.5.0; board: esp32-s3-devkitc-1; framework: arduino)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32-s3-devkitc-1.html
+PLATFORM: Espressif 32 (6.5.0) > Espressif ESP32-S3-DevKitC-1-N8 (8 MB QD, No PSRAM)
+HARDWARE: ESP32S3 240MHz, 320KB RAM, 8MB Flash
+DEBUG: Current (esp-builtin) On-board (esp-builtin) External (cmsis-dap, esp-bridge, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - framework-arduinoespressif32 @ 3.20014.231204 (2.0.14) 
+ - tool-esptoolpy @ 1.40501.0 (4.5.1) 
+ - toolchain-riscv32-esp @ 8.4.0+2021r2-patch5 
+ - toolchain-xtensa-esp32s3 @ 8.4.0+2021r2-patch5
+Converting GitMate.ino
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 45 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- LovyanGFX @ 1.1.2
+|-- lvgl @ 8.3.6
+|-- Adafruit BusIO @ 1.17.4
+|-- Adafruit GFX Library @ 1.12.4
+|-- Adafruit NeoPixel @ 1.15.2
+|-- Adafruit SSD1306 @ 2.5.9
+|-- ArduinoHttpClient @ 0.6.1
+|-- ArduinoJson @ 7.4.2
+|-- Audio @ 1.0.6
+|-- HttpClient @ 2.2.0
+|-- I2S @ 1.0
+|-- SPIFFS @ 2.0.0
+|-- SPI @ 2.0.0
+|-- Wire @ 2.0.0
+|-- UI
+|-- Preferences @ 2.0.0
+|-- WiFi @ 2.0.0
+Building in release mode
+Compiling .pio\build\gitmate\src\GitMate.ino.cpp.o
+Compiling .pio\build\gitmate\src\libraries\Adafruit_NeoPixel\examples\StrandtestBLE\BLESerial.cpp.o
+Compiling .pio\build\gitmate\src\libraries\Adafruit_NeoPixel\examples\StrandtestBLE_nodelay\BLESerial.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\conf_test\avr.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\conf_test\x64.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Cpp17\string_view.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Cpp20\smoke_test.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\BasicJsonDocument.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\DynamicJsonDocument.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\StaticJsonDocument.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\add.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\containsKey.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\createNestedArray.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\createNestedObject.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\macros.cpp.o
+Compiling .pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\memoryUsage.cpp.o
+In file included from libraries/Adafruit_NeoPixel/examples/StrandtestBLE/BLESerial.cpp:1:
+libraries/Adafruit_NeoPixel/examples/StrandtestBLE/BLESerial.h:5:10: fatal error: BLEPeripheral.h: No such file or directory
+
+***********************************************************************
+* Looking for BLEPeripheral.h dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:BLEPeripheral.h"
+* Web  > https://registry.platformio.org/search?q=header:BLEPeripheral.h
+*
+***********************************************************************
+
+ #include <BLEPeripheral.h>
+          ^~~~~~~~~~~~~~~~~
+compilation terminated.
+*** [.pio\build\gitmate\src\libraries\Adafruit_NeoPixel\examples\StrandtestBLE\BLESerial.cpp.o] Error 1
+In file included from libraries/Adafruit_NeoPixel/examples/StrandtestBLE_nodelay/BLESerial.cpp:1:
+libraries/Adafruit_NeoPixel/examples/StrandtestBLE_nodelay/BLESerial.h:5:10: fatal error: BLEPeripheral.h: No such file or directory
+
+***********************************************************************
+* Looking for BLEPeripheral.h dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:BLEPeripheral.h"
+* Web  > https://registry.platformio.org/search?q=header:BLEPeripheral.h
+*
+***********************************************************************
+
+ #include <BLEPeripheral.h>
+          ^~~~~~~~~~~~~~~~~
+compilation terminated.
+*** [.pio\build\gitmate\src\libraries\Adafruit_NeoPixel\examples\StrandtestBLE_nodelay\BLESerial.cpp.o] Error 1
+libraries/ArduinoJson/extras/tests/Cpp17/string_view.cpp:12:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+libraries/ArduinoJson/extras/tests/Deprecated/BasicJsonDocument.cpp:6:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+libraries/ArduinoJson/extras/tests/Deprecated/add.cpp:6:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+libraries/ArduinoJson/extras/tests/Cpp20/smoke_test.cpp:3:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+libraries/ArduinoJson/extras/tests/Deprecated/createNestedArray.cpp:6:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+libraries/ArduinoJson/extras/tests/Deprecated/DynamicJsonDocument.cpp:6:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+libraries/ArduinoJson/extras/tests/Deprecated/createNestedObject.cpp:6:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+libraries/ArduinoJson/extras/tests/Deprecated/StaticJsonDocument.cpp:6:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Cpp17\string_view.cpp.o] Error 1
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\BasicJsonDocument.cpp.o] Error 1
+libraries/ArduinoJson/extras/tests/Deprecated/containsKey.cpp:6:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+libraries/ArduinoJson/extras/tests/Deprecated/macros.cpp:6:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\add.cpp.o] Error 1
+libraries/ArduinoJson/extras/tests/Deprecated/memoryUsage.cpp:6:10: fatal error: catch.hpp: No such file or directory
+
+*****************************************************************
+* Looking for catch.hpp dependency? Check our library registry!
+*
+* CLI  > platformio lib search "header:catch.hpp"
+* Web  > https://registry.platformio.org/search?q=header:catch.hpp
+*
+*****************************************************************
+
+ #include <catch.hpp>
+          ^~~~~~~~~~~
+compilation terminated.
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Cpp20\smoke_test.cpp.o] Error 1
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\createNestedArray.cpp.o] Error 1
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\DynamicJsonDocument.cpp.o] Error 1
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\createNestedObject.cpp.o] Error 1
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\StaticJsonDocument.cpp.o] Error 1
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\containsKey.cpp.o] Error 1
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\macros.cpp.o] Error 1
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\tests\Deprecated\memoryUsage.cpp.o] Error 1
+libraries/ArduinoJson/extras/conf_test/avr.cpp:5:41: error: static assertion failed: ARDUINOJSON_USE_LONG_LONG
+ static_assert(ARDUINOJSON_USE_LONG_LONG == 0, "ARDUINOJSON_USE_LONG_LONG");
+libraries/ArduinoJson/extras/conf_test/avr.cpp:7:40: error: static assertion failed: ARDUINOJSON_SLOT_ID_SIZE
+ static_assert(ARDUINOJSON_SLOT_ID_SIZE == 1, "ARDUINOJSON_SLOT_ID_SIZE");
+libraries/ArduinoJson/extras/conf_test/avr.cpp:9:41: error: static assertion failed: ARDUINOJSON_POOL_CAPACITY
+ static_assert(ARDUINOJSON_POOL_CAPACITY == 16, "ARDUINOJSON_POOL_CAPACITY");
+libraries/ArduinoJson/extras/conf_test/avr.cpp:13:38: error: static assertion failed: ARDUINOJSON_USE_DOUBLE
+ static_assert(ARDUINOJSON_USE_DOUBLE == 0, "ARDUINOJSON_USE_DOUBLE");
+libraries/ArduinoJson/extras/conf_test/avr.cpp:15:62: error: static assertion failed: slot size
+ static_assert(ArduinoJson::detail::ResourceManager::slotSize == 6, "slot size");
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~
+libraries/ArduinoJson/extras/conf_test/x64.cpp:5:40: error: static assertion failed: ARDUINOJSON_SLOT_ID_SIZE
+ static_assert(ARDUINOJSON_SLOT_ID_SIZE == 4, "ARDUINOJSON_SLOT_ID_SIZE");
+libraries/ArduinoJson/extras/conf_test/x64.cpp:7:41: error: static assertion failed: ARDUINOJSON_POOL_CAPACITY
+ static_assert(ARDUINOJSON_POOL_CAPACITY == 256, "ARDUINOJSON_POOL_CAPACITY");
+libraries/ArduinoJson/extras/conf_test/x64.cpp:13:62: error: static assertion failed: slot size
+ static_assert(ArduinoJson::detail::ResourceManager::slotSize == 16,
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\conf_test\avr.cpp.o] Error 1
+*** [.pio\build\gitmate\src\libraries\ArduinoJson\extras\conf_test\x64.cpp.o] Error 1
+In file included from libraries/lvgl/src/misc/lv_log.h:16,
+                 from libraries/lvgl/lvgl.h:25,
+                 from C:/Users/varsh/OneDrive/Documents/Benz/CrowPanel_Repo/example/GitMate/GitMate.ino:21:
+libraries/lvgl/src/misc/../lv_conf_internal.h:46:120: note: #pragma message: Possible failure to include lv_conf.h, please read the comment in this file if you get errors
+         #pragma message("Possible failure to include lv_conf.h, please read the comment in this file if you get errors")
+                                                                                                                        ^
+========================= [FAILED] Took 70.19 seconds =========================

@@ -1,0 +1,22 @@
+{
+  "name": "GestureAirDraw",
+  "version": "1.0.1",
+  "description": "Draw shapes in the air using an IMU (MPU6050/9250) and output SVG paths.",
+  "keywords": ["mpu6050", "imu", "airdraw", "svg", "gesture"],
+  "authors": [
+    {
+      "name": "Herobrine Pixel"
+      "email": "ashasah77@gmail.com"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Herobrine-pixel/GestureAirDraw"
+  },
+  "frameworks": "arduino",
+  "platforms": [
+    "espressif32",
+    "atmelavr",
+    "ststm32"
+  ]
+}

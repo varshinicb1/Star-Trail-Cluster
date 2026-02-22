@@ -1,11 +1,12 @@
 /*
- * Star Trail Instrument Cluster v6.0
+ * Star Trail Instrument Cluster v7.0
  * CrowPanel 1.28" ESP32-S3 Round Display
  *
- * 7 Swipeable Widgets + Hidden System Menu (3s encoder hold)
- * WiFi OTA updates (no more BOOT+RESET!)
+ * 6 Swipeable Widgets + Hidden System Menu (3s encoder hold)
+ * WiFi OTA updates
+ * MPU9250 I2C Master mode for QMC5883L magnetometer
  * Rotary: LED brightness / volume / clock face
- * Encoder click: Play/Pause on music (live icon toggle)
+ * Encoder click: Play/Pause on music
  * Encoder 3s hold: toggle System overlay (Reboot)
  * Last widget remembered across reboots
  */
@@ -25,12 +26,11 @@
 #include "attitude.h"
 #include "ble_media.h"
 #include "calibration.h"
+#include "calibration_widget.h"
 #include "clock.h"
 #include "compass.h"
 #include "config.h"
 #include "display.h"
-#include "gps.h"
-#include "ledcolor.h"
 #include "leds.h"
 #include "music.h"
 #include "ota_update.h"
@@ -46,8 +46,8 @@
 #define W_ALTTEMP 2
 #define W_CLOCK 3
 #define W_MUSIC 4
-#define W_LEDCOLOR 5
-#define W_SENSORS 6
+#define W_SENSORS 5
+#define W_CALIBRATE 6
 
 int currentWidget = 0;
 int brightness = 50;
@@ -66,13 +66,8 @@ void sensorTask(void *p);
 void ledTask(void *p);
 void switchWidget(int dir);
 
-// ===== Gesture gating: block UP/DOWN on interactive widgets =====
-static bool gestureBlocked() {
-  return (currentWidget == W_LEDCOLOR || systemVisible);
-}
-
-static const char *wName[] = {"Compass", "Attitude", "AltTemp", "Clock",
-                              "Music",   "LED",      "Sensors"};
+static const char *wName[] = {"Compass", "Attitude", "AltTemp",  "Clock",
+                              "Music",   "Sensors",  "Calibrate"};
 
 void setup() {
   esp_task_wdt_deinit();
@@ -86,7 +81,7 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println("\n========================================");
-  Serial.println("[BOOT] Star Trail v6.0");
+  Serial.println("[BOOT] Star Trail v7.0");
   Serial.println("========================================");
 
   if (!SPIFFS.begin(true))
@@ -113,10 +108,7 @@ void setup() {
   // OTA Updates (after WiFi)
   ota_init();
 
-  // GPS
-  gps_init();
-
-  // Sensors
+  // Sensors (MPU9250 + QMC5883L via I2C master + BME280)
   if (sensors_init())
     Serial.println("[SENSORS] OK");
   else
@@ -124,13 +116,8 @@ void setup() {
 
   sensors_load_calibration();
 
-  // The gyro calibration takes 3s, matching the splash progress bar animation
+  // Gyro calibration takes 3s, matching splash progress bar
   sensors_auto_calibrate_gyro();
-
-  delay(500);
-  splash_welcome(WELCOME_NAME);
-  leds_set_mode(LED_MODE_WELCOME);
-  delay(2000); // Give the welcome animation time to finish
   leds_set_mode(LED_MODE_NORMAL);
 
   // Init all widgets
@@ -139,9 +126,9 @@ void setup() {
   alttemp_init();
   clock_init();
   music_init();
-  ledcolor_init();
   sensorview_init();
   systemview_init();
+  calwidget_init();
 
   // Restore last widget from SPIFFS
   int savedWidget = 0;
@@ -170,11 +157,11 @@ void setup() {
   case W_MUSIC:
     music_show();
     break;
-  case W_LEDCOLOR:
-    ledcolor_show();
-    break;
   case W_SENSORS:
     sensorview_show();
+    break;
+  case W_CALIBRATE:
+    calwidget_show();
     break;
   }
   Serial.printf("[UI] %s (%d/%d)\n", wName[currentWidget], currentWidget + 1,
@@ -189,26 +176,19 @@ void loop() {
   lv_timer_handler();
   ota_handle(); // Check for OTA updates
 
-  // GPS update
-  gps_update();
-
-  // ===== Touch gestures — gated on interactive widgets =====
+  // ===== Touch gestures — both directions work =====
   uint8_t g = touch_get_gesture();
-  if (g != 0) {
+  if (g != 0 && !systemVisible) {
     switch (g) {
     case GESTURE_SWIPE_UP:
-      if (!gestureBlocked())
-        switchWidget(1);
+      switchWidget(1);
       break;
     case GESTURE_SWIPE_DOWN:
-      if (!gestureBlocked())
-        switchWidget(-1);
+      switchWidget(-1);
       break;
     case GESTURE_SWIPE_LEFT:
       if (currentWidget == W_MUSIC) {
         music_prev_track();
-      } else if (gestureBlocked()) {
-        switchWidget(-1); // L/R to navigate on widgets that block U/D
       } else {
         screenBrightness = constrain(screenBrightness - 10, 10, 100);
         display_set_brightness(screenBrightness);
@@ -217,8 +197,6 @@ void loop() {
     case GESTURE_SWIPE_RIGHT:
       if (currentWidget == W_MUSIC) {
         music_next_track();
-      } else if (gestureBlocked()) {
-        switchWidget(1);
       } else {
         screenBrightness = constrain(screenBrightness + 10, 10, 100);
         display_set_brightness(screenBrightness);
@@ -300,9 +278,6 @@ void loop() {
       case W_MUSIC:
         music_show();
         break;
-      case W_LEDCOLOR:
-        ledcolor_show();
-        break;
       case W_SENSORS:
         sensorview_show();
         break;
@@ -328,7 +303,6 @@ void loop() {
   switch (currentWidget) {
   case W_COMPASS:
     compass_update(gH);
-    compass_update_speed(gps_get_speed_kmh());
     break;
   case W_ATTITUDE:
     attitude_update(gP, gR);
@@ -342,9 +316,6 @@ void loop() {
   case W_MUSIC:
     music_update();
     break;
-  case W_LEDCOLOR:
-    ledcolor_update();
-    break;
   case W_SENSORS: {
     int16_t mx, my, mz;
     float ax, ay, az, gx, gy, gz;
@@ -355,6 +326,9 @@ void loop() {
                       gz);
     break;
   }
+  case W_CALIBRATE:
+    calwidget_update();
+    break;
   }
   delay(5);
 }
@@ -376,11 +350,11 @@ void switchWidget(int dir) {
   case W_MUSIC:
     music_hide();
     break;
-  case W_LEDCOLOR:
-    ledcolor_hide();
-    break;
   case W_SENSORS:
     sensorview_hide();
+    break;
+  case W_CALIBRATE:
+    calwidget_hide();
     break;
   }
   currentWidget = (currentWidget + dir + NUM_WIDGETS) % NUM_WIDGETS;
@@ -400,11 +374,11 @@ void switchWidget(int dir) {
   case W_MUSIC:
     music_show();
     break;
-  case W_LEDCOLOR:
-    ledcolor_show();
-    break;
   case W_SENSORS:
     sensorview_show();
+    break;
+  case W_CALIBRATE:
+    calwidget_show();
     break;
   }
   Serial.printf("[UI] %s (%d/%d)\n", wName[currentWidget], currentWidget + 1,

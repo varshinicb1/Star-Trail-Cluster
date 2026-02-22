@@ -1,0 +1,26 @@
+C:\Users\varsh\Documents\Arduino\libraries\ESPAsyncWebServer\src\WebAuthentication.cpp:26:10: fatal error: md5.h: No such file or directory
+ #include "md5.h"
+          ^~~~~~~
+compilation terminated.
+Error during build: exit status 1
+
+[92mUsed library[0m      [92mVersion[0m [90mPath[0m
+[93mAdafruit NeoPixel[0m 1.15.3  [90mC:\Users\varsh\Documents\Arduino\libraries\Adafruit_NeoPixel[0m
+[93mArduinoJson[0m       7.4.2   [90mC:\Users\varsh\Documents\Arduino\libraries\ArduinoJson[0m
+[93mLovyanGFX[0m         1.2.19  [90mC:\Users\varsh\Documents\Arduino\libraries\LovyanGFX[0m
+[93mSPIFFS[0m            2.0.0   [90mC:\Users\varsh\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.16\libraries\SPIFFS[0m
+[93mFS[0m                2.0.0   [90mC:\Users\varsh\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.16\libraries\FS[0m
+[93mWiFi[0m              2.0.0   [90mC:\Users\varsh\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.16\libraries\WiFi[0m
+[93mlvgl[0m              8.3.11  [90mC:\Users\varsh\Documents\Arduino\libraries\lvgl[0m
+[93mNimBLE-Arduino[0m    2.3.7   [90mC:\Users\varsh\Documents\Arduino\libraries\NimBLE-Arduino[0m
+[93mArduinoOTA[0m        2.0.0   [90mC:\Users\varsh\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.16\libraries\ArduinoOTA[0m
+[93mUpdate[0m            2.0.0   [90mC:\Users\varsh\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.16\libraries\Update[0m
+[93mESPAsyncWebServer[0m 3.1.0   [90mC:\Users\varsh\Documents\Arduino\libraries\ESPAsyncWebServer[0m
+[93mESPAsyncTCP[0m       1.2.4   [90mC:\Users\varsh\Documents\Arduino\libraries\ESPAsyncTCP[0m
+[93mWire[0m              2.0.0   [90mC:\Users\varsh\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.16\libraries\Wire[0m
+[93mHTTPClient[0m        2.0.0   [90mC:\Users\varsh\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.16\libraries\HTTPClient[0m
+[93mWiFiClientSecure[0m  2.0.0   [90mC:\Users\varsh\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.16\libraries\WiFiClientSecure[0m
+[93mESPmDNS[0m           2.0.0   [90mC:\Users\varsh\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.16\libraries\ESPmDNS[0m
+
+[92mUsed platform[0m [92mVersion[0m [90mPath[0m
+[93mesp32:esp32[0m   2.0.16  [90mC:\Users\varsh\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.16[0m

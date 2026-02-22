@@ -36,10 +36,10 @@ void music_init() {
 
   // BLE status indicator
   statusLabel = lv_label_create(musicScreen);
-  lv_label_set_text(statusLabel, "BLE: Disconnected");
+  lv_label_set_text(statusLabel, LV_SYMBOL_BLUETOOTH " Star Trail");
   lv_obj_set_style_text_font(statusLabel, &lv_font_montserrat_10, 0);
   lv_obj_set_style_text_color(statusLabel, lv_color_hex(0xFF4444), 0);
-  lv_obj_align(statusLabel, LV_ALIGN_TOP_MID, 0, 35);
+  lv_obj_align(statusLabel, LV_ALIGN_TOP_MID, 0, 30);
 
   // Play/pause icon - large centered (persistent for toggling)
   playIcon = lv_label_create(musicScreen);
@@ -127,13 +127,13 @@ void music_update() {
   bool connected = ble_media_connected();
   if (connected != lastConnected) {
     if (connected) {
-      lv_label_set_text(statusLabel, "BLE: Connected");
+      lv_label_set_text(statusLabel, LV_SYMBOL_BLUETOOTH " Connected");
       lv_obj_set_style_text_color(statusLabel, lv_color_hex(0x44FF44), 0);
     } else {
-      lv_label_set_text(statusLabel, "BLE: Disconnected");
+      lv_label_set_text(statusLabel, LV_SYMBOL_BLUETOOTH " Star Trail");
       lv_obj_set_style_text_color(statusLabel, lv_color_hex(0xFF4444), 0);
     }
-    lv_obj_align(statusLabel, LV_ALIGN_TOP_MID, 0, 35);
+    lv_obj_align(statusLabel, LV_ALIGN_TOP_MID, 0, 30);
     lastConnected = connected;
   }
 }

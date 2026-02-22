@@ -67,13 +67,6 @@ void splash_show() {
   lv_obj_set_style_text_letter_space(brandLabel, 6, 0);
   lv_obj_align(brandLabel, LV_ALIGN_CENTER, 0, 80);
 
-  lv_obj_t *subBrand = lv_label_create(splashScreen);
-  lv_label_set_text(subBrand, "Mercedes-Benz");
-  lv_obj_set_style_text_font(subBrand, &lv_font_montserrat_10, 0);
-  lv_obj_set_style_text_color(subBrand, lv_color_hex(0x666666), 0);
-  lv_obj_set_style_text_letter_space(subBrand, 2, 0);
-  lv_obj_align(subBrand, LV_ALIGN_CENTER, 0, 95);
-
   // Progress bar (3s gyro cal)
   progressBar = lv_bar_create(splashScreen);
   lv_obj_set_size(progressBar, 140, 4);
@@ -97,48 +90,6 @@ void splash_show() {
   lv_anim_start(&a);
 
   lv_timer_handler();
-}
-
-void splash_welcome(const char *name) {
-  lv_obj_clean(splashScreen);
-  lv_obj_set_style_bg_color(splashScreen, lv_color_hex(0x000000), 0);
-
-  welcomeLabel = lv_label_create(splashScreen);
-  char buf[64];
-  snprintf(buf, sizeof(buf), "Welcome, %s", name);
-  lv_label_set_text(welcomeLabel, buf);
-  lv_obj_set_style_text_font(welcomeLabel, &lv_font_montserrat_28, 0);
-  lv_obj_set_style_text_color(welcomeLabel, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_align(welcomeLabel, LV_ALIGN_CENTER, 0, -20);
-
-  lv_obj_t *subLabel = lv_label_create(splashScreen);
-  lv_label_set_text(subLabel, "Star Trail Ready");
-  lv_obj_set_style_text_font(subLabel, &lv_font_montserrat_14, 0);
-  lv_obj_set_style_text_color(subLabel, lv_color_hex(0x808080), 0);
-  lv_obj_align(subLabel, LV_ALIGN_CENTER, 0, 30);
-
-  lv_obj_set_style_opa(welcomeLabel, 0, 0);
-  lv_obj_set_style_opa(subLabel, 0, 0);
-
-  lv_anim_t a;
-  lv_anim_init(&a);
-  lv_anim_set_var(&a, welcomeLabel);
-  lv_anim_set_values(&a, 0, 255);
-  lv_anim_set_time(&a, 800);
-  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
-    lv_obj_set_style_opa((lv_obj_t *)obj, v, 0);
-  });
-  lv_anim_start(&a);
-
-  lv_anim_set_var(&a, subLabel);
-  lv_anim_set_delay(&a, 400);
-  lv_anim_start(&a);
-
-  unsigned long start = millis();
-  while (millis() - start < 1500) {
-    lv_timer_handler();
-    delay(5);
-  }
 }
 
 void splash_hide() {

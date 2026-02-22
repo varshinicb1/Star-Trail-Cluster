@@ -1,11 +1,8 @@
 #ifndef SPLASH_H
 #define SPLASH_H
 
-// Show Mercedes splash screen
+// Show splash screen with logo and progress bar
 void splash_show();
-
-// Show welcome message
-void splash_welcome(const char *name);
 
 // Hide splash and transition to main UI
 void splash_hide();

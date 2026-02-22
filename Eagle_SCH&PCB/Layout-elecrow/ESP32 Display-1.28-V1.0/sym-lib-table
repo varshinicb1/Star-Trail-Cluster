@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 0)
+  (lib (name "ESP32 Display-1.28-V1.0-eagle-import")(type "KiCad")(uri "${KIPRJMOD}/ESP32 Display-1.28-V1.0-eagle-import.kicad_sym")(options "")(descr ""))
+)
