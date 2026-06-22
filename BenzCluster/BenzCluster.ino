@@ -23,6 +23,7 @@
 #include <lvgl.h>
 #include <time.h>
 
+#include "airplane.h"
 #include "alttemp.h"
 #include "attitude.h"
 #include "ble_media.h"
@@ -42,13 +43,14 @@
 #include "systemview.h"
 #include "wifi_manager.h"
 
-#define NUM_WIDGETS 6
+#define NUM_WIDGETS 7
 #define W_CLOCK 0
 #define W_COMPASS 1
 #define W_ATTITUDE 2
 #define W_ALTTEMP 3
 #define W_GFORCE 4
 #define W_MUSIC 5
+#define W_AIRPLANE 6
 
 int currentWidget = 0;
 int brightness = 50;
@@ -68,7 +70,7 @@ void ledTask(void *p);
 void switchWidget(int dir);
 
 static const char *wName[] = {"Clock",   "Compass", "Attitude",
-                              "AltTemp", "G-Force", "Music"};
+                              "AltTemp", "G-Force", "Music", "Airplane"};
 
 // BLE notification toast overlay
 static lv_obj_t *toastObj = NULL;
@@ -159,6 +161,7 @@ void setup() {
   clock_init();
   music_init();
   gforce_init();
+  airplane_init();
   sensorview_init();
   systemview_init();
 
@@ -320,6 +323,9 @@ void loop() {
       case W_GFORCE:
         gforce_show();
         break;
+      case W_AIRPLANE:
+        airplane_show();
+        break;
       }
       Serial.println("[UI] System overlay OFF (3s hold)");
     }
@@ -334,6 +340,19 @@ void loop() {
       }
     }
     btnHeld = false;
+  }
+
+  // ===== BLE data notify (every 500ms) =====
+  {
+    static uint32_t lastBleNotify = 0;
+    if (millis() - lastBleNotify > 500) {
+      lastBleNotify = millis();
+      char json[256];
+      snprintf(json, sizeof(json),
+               "{\"h\":%.1f,\"p\":%.1f,\"r\":%.1f,\"t\":%.1f,\"a\":%.1f,\"pr\":%.1f}",
+               (float)gH, (float)gP, (float)gR, (float)gT, (float)gA, (float)gPr);
+      ble_data_notify(json);
+    }
   }
 
   // ===== Update current widget =====
@@ -359,6 +378,9 @@ void loop() {
     gforce_update(ax, ay, az);
     break;
   }
+  case W_AIRPLANE:
+    airplane_update(gP, gR, gH);
+    break;
   }
   delay(5);
 }
@@ -383,6 +405,9 @@ void switchWidget(int dir) {
   case W_GFORCE:
     gforce_hide();
     break;
+  case W_AIRPLANE:
+    airplane_hide();
+    break;
   }
   currentWidget = (currentWidget + dir + NUM_WIDGETS) % NUM_WIDGETS;
   switch (currentWidget) {
@@ -403,6 +428,9 @@ void switchWidget(int dir) {
     break;
   case W_GFORCE:
     gforce_show();
+    break;
+  case W_AIRPLANE:
+    airplane_show();
     break;
   }
   Serial.printf("[UI] %s (%d/%d)\n", wName[currentWidget], currentWidget + 1,

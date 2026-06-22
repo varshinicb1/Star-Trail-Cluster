@@ -38,6 +38,12 @@ static lv_obj_t *acLeft = NULL;
 static lv_obj_t *acRight = NULL;
 static lv_obj_t *acCenter = NULL;
 
+// Virtual runway (miercemk-inspired)
+static lv_obj_t *runwayObj = NULL;
+static lv_obj_t *rwyEdge1 = NULL;
+static lv_obj_t *rwyEdge2 = NULL;
+static lv_obj_t *rwyEdge3 = NULL;
+
 // Bank angle arc + ticks (ICAO: 10, 20, 30, 45, 60)
 static lv_obj_t *bankArc = NULL;
 #define NUM_BANK_TICKS 11
@@ -96,6 +102,32 @@ void attitude_init() {
   lv_obj_set_style_bg_color(horizLine, lv_color_hex(0xFFFFFF), 0);
   lv_obj_set_style_border_width(horizLine, 0, 0);
   lv_obj_set_style_radius(horizLine, 0, 0);
+
+  // === Virtual Runway (airport-style perspective) ===
+  static lv_point_t rwyPts[3];
+  static lv_point_t rwyLine1[2];
+  static lv_point_t rwyLine2[2];
+  static lv_point_t rwyLine3[2];
+  runwayObj = lv_line_create(attitudeScreen);
+  lv_line_set_points(runwayObj, rwyPts, 3);
+  lv_obj_set_style_line_color(runwayObj, lv_color_hex(0x502616), 0);
+  lv_obj_set_style_line_width(runwayObj, 0, 0);
+  lv_obj_set_style_line_opa(runwayObj, LV_OPA_80, 0);
+
+  rwyEdge1 = lv_line_create(attitudeScreen);
+  lv_line_set_points(rwyEdge1, rwyLine1, 2);
+  lv_obj_set_style_line_color(rwyEdge1, lv_color_hex(0xFF8800), 0);
+  lv_obj_set_style_line_width(rwyEdge1, 2, 0);
+
+  rwyEdge2 = lv_line_create(attitudeScreen);
+  lv_line_set_points(rwyEdge2, rwyLine2, 2);
+  lv_obj_set_style_line_color(rwyEdge2, lv_color_hex(0xFF8800), 0);
+  lv_obj_set_style_line_width(rwyEdge2, 2, 0);
+
+  rwyEdge3 = lv_line_create(attitudeScreen);
+  lv_line_set_points(rwyEdge3, rwyLine3, 2);
+  lv_obj_set_style_line_color(rwyEdge3, lv_color_hex(0xFF8800), 0);
+  lv_obj_set_style_line_width(rwyEdge3, 2, 0);
 
   // === Pitch ladder ===
   for (int i = 0; i < NUM_PITCH_MARKS; i++) {
@@ -174,27 +206,38 @@ void attitude_init() {
   lv_obj_set_style_line_width(rollPtr, 2, 0);
   lv_obj_set_style_line_color(rollPtr, lv_color_hex(0xFFDD00), 0);
 
-  // === Aircraft symbol (fixed orange wings + center dot) ===
+  // === Aircraft symbol (miercemk-style: long yellow wings + inverted V) ===
   acLeft = lv_obj_create(attitudeScreen);
-  lv_obj_set_size(acLeft, 35, 4);
-  lv_obj_align(acLeft, LV_ALIGN_CENTER, -32, 0);
-  lv_obj_set_style_bg_color(acLeft, lv_color_hex(0xFF8800), 0);
+  lv_obj_set_size(acLeft, 70, 5);
+  lv_obj_align(acLeft, LV_ALIGN_CENTER, -55, 0);
+  lv_obj_set_style_bg_color(acLeft, lv_color_hex(0xFFDD00), 0);
   lv_obj_set_style_border_width(acLeft, 0, 0);
-  lv_obj_set_style_radius(acLeft, 1, 0);
+  lv_obj_set_style_radius(acLeft, 2, 0);
+  lv_obj_set_style_shadow_width(acLeft, 6, 0);
+  lv_obj_set_style_shadow_color(acLeft, lv_color_hex(0xFFDD00), 0);
+  lv_obj_set_style_shadow_opa(acLeft, LV_OPA_40, 0);
 
   acRight = lv_obj_create(attitudeScreen);
-  lv_obj_set_size(acRight, 35, 4);
-  lv_obj_align(acRight, LV_ALIGN_CENTER, 32, 0);
-  lv_obj_set_style_bg_color(acRight, lv_color_hex(0xFF8800), 0);
+  lv_obj_set_size(acRight, 70, 5);
+  lv_obj_align(acRight, LV_ALIGN_CENTER, 55, 0);
+  lv_obj_set_style_bg_color(acRight, lv_color_hex(0xFFDD00), 0);
   lv_obj_set_style_border_width(acRight, 0, 0);
-  lv_obj_set_style_radius(acRight, 1, 0);
+  lv_obj_set_style_radius(acRight, 2, 0);
+  lv_obj_set_style_shadow_width(acRight, 6, 0);
+  lv_obj_set_style_shadow_color(acRight, lv_color_hex(0xFFDD00), 0);
+  lv_obj_set_style_shadow_opa(acRight, LV_OPA_40, 0);
 
-  acCenter = lv_obj_create(attitudeScreen);
-  lv_obj_set_size(acCenter, 8, 8);
-  lv_obj_align(acCenter, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_bg_color(acCenter, lv_color_hex(0xFF8800), 0);
-  lv_obj_set_style_border_width(acCenter, 0, 0);
-  lv_obj_set_style_radius(acCenter, 4, 0);
+  // Inverted V center
+  acCenter = lv_line_create(attitudeScreen);
+  static lv_point_t ctrPts[4];
+  ctrPts[0] = PT(CX - 18, CY - 2);
+  ctrPts[1] = PT(CX, CY + 14);
+  ctrPts[2] = PT(CX + 18, CY - 2);
+  ctrPts[3] = PT(CX, CY + 14);
+  lv_line_set_points(acCenter, ctrPts, 4);
+  lv_obj_set_style_line_color(acCenter, lv_color_hex(0xFFDD00), 0);
+  lv_obj_set_style_line_width(acCenter, 5, 0);
+  lv_obj_set_style_line_rounded(acCenter, true, 0);
 
   // === HUD values (large, always visible) ===
   pitchValLabel = lv_label_create(attitudeScreen);
@@ -232,8 +275,8 @@ void attitude_update(float pitch, float roll) {
   float r = prevRoll;
   int pitchPx = (int)(p * PPD);
 
-  // Move sky/ground/horizon
-  lv_obj_set_pos(skyRect, -20, CY + pitchPx - 280);
+  // Move sky/ground/horizon (full 240px width for circular clip)
+  lv_obj_set_pos(skyRect, -20, CY + pitchPx - 240);
   lv_obj_set_pos(gndRect, -20, CY + pitchPx);
   lv_obj_set_pos(horizLine, -20, CY + pitchPx - 1);
 
@@ -260,6 +303,36 @@ void attitude_update(float pitch, float roll) {
       lv_obj_set_pos(pLabelsL[i], pPts[i][0].x - 18, pPts[i][0].y - 6);
       lv_obj_set_pos(pLabelsR[i], pPts[i][1].x + 4, pPts[i][1].y - 6);
     }
+  }
+
+  // === Virtual Runway (miercemk-style filled triangle + perspective) ===
+  {
+    float rwyTop = 8.0f - pitchPx;
+    float rwyBot = 120.0f - pitchPx;
+    float rwyHalf = 100.0f;
+    // Runway triangle (thick brown line simulates filled polygon)
+    static lv_point_t rPts[3];
+    rPts[0] = PT(CX, (lv_coord_t)(CY + rwyTop));
+    rPts[1] = PT(CX - rwyHalf, (lv_coord_t)(CY + rwyBot));
+    rPts[2] = PT(CX + rwyHalf, (lv_coord_t)(CY + rwyBot));
+    lv_line_set_points(runwayObj, rPts, 3);
+    lv_obj_set_style_line_width(runwayObj, 50, 0);
+    lv_obj_set_style_line_rounded(runwayObj, false, 0);
+
+    // Orange perspective lines
+    float rwyMid = 36.0f;
+    static lv_point_t e1[2], e2[2], e3[2];
+    e1[0] = rPts[0];
+    e1[1] = PT(CX - rwyMid, (lv_coord_t)(CY + rwyBot));
+    lv_line_set_points(rwyEdge1, e1, 2);
+
+    e2[0] = rPts[0];
+    e2[1] = PT(CX + rwyMid, (lv_coord_t)(CY + rwyBot));
+    lv_line_set_points(rwyEdge2, e2, 2);
+
+    e3[0] = PT(CX - rwyMid, (lv_coord_t)(CY + rwyBot));
+    e3[1] = PT(CX + rwyMid, (lv_coord_t)(CY + rwyBot));
+    lv_line_set_points(rwyEdge3, e3, 2);
   }
 
   // Roll pointer (yellow, moves along bank arc)

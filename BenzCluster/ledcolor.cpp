@@ -16,7 +16,8 @@ static uint32_t selectedColor = 0xFFAA00;
 static void colorwheel_cb(lv_event_t *e) {
   lv_obj_t *cw = lv_event_get_target(e);
   lv_color_t c = lv_colorwheel_get_rgb(cw);
-  selectedColor = ((uint32_t)c.ch.red << 19) | ((uint32_t)c.ch.green << 10) |
+  uint32_t g6 = ((uint32_t)c.ch.green_h << 3) | c.ch.green_l;
+  selectedColor = ((uint32_t)c.ch.red << 19) | (g6 << 10) |
                   ((uint32_t)c.ch.blue << 3);
   lv_obj_set_style_bg_color(previewDot, c, 0);
   leds_set_color(selectedColor);
