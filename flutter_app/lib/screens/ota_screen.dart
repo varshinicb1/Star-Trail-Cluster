@@ -7,8 +7,8 @@ class OTAScreen extends StatefulWidget {
 }
 
 class _OTAScreenState extends State<OTAScreen> {
-  double _progress = 0;
-  String _status = 'Ready';
+  final double _progress = 0;
+  final String _status = 'Ready';
 
   @override
   Widget build(BuildContext context) {

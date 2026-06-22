@@ -168,7 +168,8 @@ void alttemp_init() {
 
   // === Temperature readout (bottom) ===
   tempLabel = lv_label_create(alttempScreen);
-  lv_label_set_text(tempLabel, "--.- \xC2\xB0C");
+  lv_label_set_text(tempLabel, "--.- \xC2\xB0"
+                     "C");
   lv_obj_set_style_text_font(tempLabel, &lv_font_montserrat_10, 0);
   lv_obj_set_style_text_color(tempLabel, lv_color_hex(0xFF6644), 0);
   lv_obj_align(tempLabel, LV_ALIGN_CENTER, 0, 105);
@@ -214,7 +215,8 @@ void alttemp_update(float temperature, float altitude) {
   if (tempChanged) {
     lastTempC = tempC;
     char buf[16];
-    snprintf(buf, sizeof(buf), "%.1f \xC2\xB0C", tempC);
+    snprintf(buf, sizeof(buf), "%.1f \xC2\xB0"
+                     "C", tempC);
     lv_label_set_text(tempLabel, buf);
     lv_obj_align(tempLabel, LV_ALIGN_CENTER, 0, 105);
   }

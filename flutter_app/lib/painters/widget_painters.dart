@@ -10,8 +10,9 @@ class ClockPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (face == 0) _drawAnalog(canvas);
-    else if (face == 1) _drawDigital(canvas);
+    if (face == 0) {
+      _drawAnalog(canvas);
+    } else if (face == 1) _drawDigital(canvas);
     else _drawMinimal(canvas);
   }
 

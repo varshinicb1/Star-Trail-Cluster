@@ -5,7 +5,7 @@
 #include <math.h>
 #include <stdio.h>
 
-#define PT(x, y) ((lv_point_t){(lv_coord_t)(x), (lv_coord_t)(y)})
+static inline lv_point_t PT(lv_coord_t x, lv_coord_t y) { lv_point_t p; p.x = x; p.y = y; return p; }
 
 static lv_obj_t *airplaneScreen = NULL;
 static lv_obj_t *planeContainer = NULL;
