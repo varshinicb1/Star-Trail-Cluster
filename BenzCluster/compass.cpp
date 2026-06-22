@@ -10,7 +10,6 @@ static lv_obj_t *rulerContainer = NULL;
 static lv_obj_t *degreeLabel = NULL;
 static lv_obj_t *cardinalLabel = NULL;
 static lv_obj_t *centerNeedle = NULL;
-static lv_obj_t *speedLabel = NULL; // "0 km/h" on one line
 
 #define VISIBLE_W SCREEN_WIDTH
 #define TICK_SPACING 2
@@ -21,7 +20,6 @@ static lv_obj_t *tickLabels[MAX_TICKS];
 static int numTicks = 0;
 
 static float lastHeading = -999;
-static float lastSpeed = -999;
 static float smoothHeading = 0;
 
 static const char *getCardinal(float h) {
@@ -77,12 +75,12 @@ void compass_init() {
   lv_obj_set_style_bg_color(compassScreen, lv_color_hex(0x0A0A0A), 0);
   lv_obj_clear_flag(compassScreen, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Speed display — "0 km/h" on one line, centered at top
-  speedLabel = lv_label_create(compassScreen);
-  lv_label_set_text(speedLabel, "0 km/h");
-  lv_obj_set_style_text_font(speedLabel, &lv_font_montserrat_28, 0);
-  lv_obj_set_style_text_color(speedLabel, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_align(speedLabel, LV_ALIGN_CENTER, 0, -55);
+  // Heading degree label (centered at top)
+  degreeLabel = lv_label_create(compassScreen);
+  lv_label_set_text(degreeLabel, "0\xC2\xB0");
+  lv_obj_set_style_text_font(degreeLabel, &lv_font_montserrat_28, 0);
+  lv_obj_set_style_text_color(degreeLabel, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_align(degreeLabel, LV_ALIGN_CENTER, 0, -55);
 
   // Ruler container — centered vertically
   rulerContainer = lv_obj_create(compassScreen);
@@ -127,13 +125,6 @@ void compass_init() {
   lv_obj_set_style_border_width(pointer, 0, 0);
   lv_obj_set_style_radius(pointer, 4, 0);
 
-  // Heading degree
-  degreeLabel = lv_label_create(compassScreen);
-  lv_label_set_text(degreeLabel, "0°");
-  lv_obj_set_style_text_font(degreeLabel, &lv_font_montserrat_18, 0);
-  lv_obj_set_style_text_color(degreeLabel, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_align(degreeLabel, LV_ALIGN_CENTER, 0, 68);
-
   // Cardinal direction
   cardinalLabel = lv_label_create(compassScreen);
   lv_label_set_text(cardinalLabel, "N");
@@ -149,23 +140,13 @@ void compass_show() {
 }
 void compass_hide() {}
 
-void compass_update_speed(float speedKmh) {
-  if (fabs(speedKmh - lastSpeed) < 0.5f)
-    return;
-  lastSpeed = speedKmh;
-  char buf[16];
-  snprintf(buf, sizeof(buf), "%d km/h", (int)(speedKmh + 0.5f));
-  lv_label_set_text(speedLabel, buf);
-  lv_obj_align(speedLabel, LV_ALIGN_CENTER, 0, -55);
-}
-
 void compass_update(float heading_in) {
   float diff = heading_in - smoothHeading;
   if (diff > 180)
     diff -= 360;
   if (diff < -180)
     diff += 360;
-  smoothHeading += diff * 0.15f;
+  smoothHeading += diff * 0.25f;
   if (smoothHeading < 0)
     smoothHeading += 360;
   if (smoothHeading >= 360)
@@ -178,7 +159,7 @@ void compass_update(float heading_in) {
   char buf[16];
   snprintf(buf, sizeof(buf), "%d°", (int)(smoothHeading + 0.5f));
   lv_label_set_text(degreeLabel, buf);
-  lv_obj_align(degreeLabel, LV_ALIGN_CENTER, 0, 68);
+  lv_obj_align(degreeLabel, LV_ALIGN_CENTER, 0, -55);
   lv_label_set_text(cardinalLabel, getCardinal(smoothHeading));
   lv_obj_align(cardinalLabel, LV_ALIGN_CENTER, 0, 90);
 

@@ -4,7 +4,6 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 
-
 // Calibration state
 static bool calibrating = false;
 static uint32_t calibrationStart = 0;
@@ -59,10 +58,10 @@ bool calibration_save() {
   float offsetY = (magMaxY + magMinY) / 2.0f;
   float offsetZ = (magMaxZ + magMinZ) / 2.0f;
 
-  // Calculate scales (soft-iron)
-  float rangeX = (magMaxX - magMinX) / 2.0f;
-  float rangeY = (magMaxY - magMinY) / 2.0f;
-  float rangeZ = (magMaxZ - magMinZ) / 2.0f;
+  // Calculate scales (soft-iron) — guard against zero range (saturated axis)
+  float rangeX = max(1.0f, (magMaxX - magMinX) / 2.0f);
+  float rangeY = max(1.0f, (magMaxY - magMinY) / 2.0f);
+  float rangeZ = max(1.0f, (magMaxZ - magMinZ) / 2.0f);
   float avgRange = (rangeX + rangeY + rangeZ) / 3.0f;
 
   float scaleX = avgRange / rangeX;

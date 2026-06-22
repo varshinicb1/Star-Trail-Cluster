@@ -35,6 +35,8 @@ void sensors_set_sea_level_pressure(float pressure_hPa);
 // Auto-calibration: run for N seconds, save to SPIFFS
 void sensors_auto_calibrate(int durationSec);
 void sensors_auto_calibrate_gyro(); // 3s gyro bias at startup
+void sensors_auto_calibrate_mag(
+    int durationSec); // Boot-time mag hard/soft iron cal
 bool sensors_load_calibration();
 void sensors_save_calibration();
 

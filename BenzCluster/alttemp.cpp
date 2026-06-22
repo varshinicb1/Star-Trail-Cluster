@@ -96,7 +96,7 @@ void alttemp_init() {
 
   // Altitude value - centered
   altLabel = lv_label_create(alttempScreen);
-  lv_label_set_text(altLabel, "---- ft");
+  lv_label_set_text(altLabel, "---- m");
   lv_obj_set_style_text_font(altLabel, &lv_font_montserrat_24, 0);
   lv_obj_set_style_text_color(altLabel, lv_color_hex(0xFFFFFF), 0);
   lv_obj_align(altLabel, LV_ALIGN_CENTER, 15, 35);
@@ -133,7 +133,7 @@ void alttemp_update(float temperature, float altitude) {
   if (altChanged) {
     lastAlt = altitude;
     char buf[16];
-    snprintf(buf, sizeof(buf), "%.0f ft", altitude);
+    snprintf(buf, sizeof(buf), "%.0f ft", altitude * 3.28084f);
     lv_label_set_text(altLabel, buf);
     lv_obj_align(altLabel, LV_ALIGN_CENTER, 15, 35);
   }

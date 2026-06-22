@@ -1,13 +1,14 @@
 /*
- * Star Trail Instrument Cluster v7.0
+ * Star Trail Instrument Cluster v8.0
  * CrowPanel 1.28" ESP32-S3 Round Display
  *
  * 6 Swipeable Widgets + Hidden System Menu (3s encoder hold)
- * WiFi OTA updates
- * MPU9250 I2C Master mode for QMC5883L magnetometer
+ * WiFi OTA updates + Web Dashboard
+ * MPU9250 + AK8963 magnetometer (9-DOF)
+ * Two-way BLE: HID media + phone notifications
  * Rotary: LED brightness / volume / clock face
  * Encoder click: Play/Pause on music
- * Encoder 3s hold: toggle System overlay (Reboot)
+ * Encoder 3s hold: toggle System overlay
  * Last widget remembered across reboots
  */
 
@@ -25,12 +26,13 @@
 #include "alttemp.h"
 #include "attitude.h"
 #include "ble_media.h"
+#include "ble_notify.h"
 #include "calibration.h"
-#include "calibration_widget.h"
 #include "clock.h"
 #include "compass.h"
 #include "config.h"
 #include "display.h"
+#include "gforce.h"
 #include "leds.h"
 #include "music.h"
 #include "ota_update.h"
@@ -40,21 +42,20 @@
 #include "systemview.h"
 #include "wifi_manager.h"
 
-#define NUM_WIDGETS 7
-#define W_COMPASS 0
-#define W_ATTITUDE 1
-#define W_ALTTEMP 2
-#define W_CLOCK 3
-#define W_MUSIC 4
-#define W_SENSORS 5
-#define W_CALIBRATE 6
+#define NUM_WIDGETS 6
+#define W_CLOCK 0
+#define W_COMPASS 1
+#define W_ATTITUDE 2
+#define W_ALTTEMP 3
+#define W_GFORCE 4
+#define W_MUSIC 5
 
 int currentWidget = 0;
 int brightness = 50;
 int musicVolume = 50;
 int screenBrightness = 100;
 bool calibrationMode = false;
-bool systemVisible = false; // System overlay state
+bool systemVisible = false;
 
 volatile float gH = 0, gP = 0, gR = 0;
 volatile float gT = 0, gA = 0, gPr = 0;
@@ -66,8 +67,36 @@ void sensorTask(void *p);
 void ledTask(void *p);
 void switchWidget(int dir);
 
-static const char *wName[] = {"Compass", "Attitude", "AltTemp",  "Clock",
-                              "Music",   "Sensors",  "Calibrate"};
+static const char *wName[] = {"Clock",   "Compass", "Attitude",
+                              "AltTemp", "G-Force", "Music"};
+
+// BLE notification toast overlay
+static lv_obj_t *toastObj = NULL;
+static lv_obj_t *toastLabel = NULL;
+static uint32_t toastShowTime = 0;
+
+static void showToast(const char *msg) {
+  if (!toastObj) {
+    toastObj = lv_obj_create(lv_layer_top());
+    lv_obj_set_size(toastObj, 200, 36);
+    lv_obj_align(toastObj, LV_ALIGN_TOP_MID, 0, 20);
+    lv_obj_set_style_bg_color(toastObj, lv_color_hex(0x1A1A3A), 0);
+    lv_obj_set_style_bg_opa(toastObj, LV_OPA_90, 0);
+    lv_obj_set_style_radius(toastObj, 18, 0);
+    lv_obj_set_style_border_color(toastObj, lv_color_hex(0x4444FF), 0);
+    lv_obj_set_style_border_width(toastObj, 1, 0);
+    lv_obj_clear_flag(toastObj, LV_OBJ_FLAG_SCROLLABLE);
+
+    toastLabel = lv_label_create(toastObj);
+    lv_obj_set_style_text_font(toastLabel, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_color(toastLabel, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_center(toastLabel);
+  }
+  lv_label_set_text(toastLabel, msg);
+  lv_obj_center(toastLabel);
+  lv_obj_clear_flag(toastObj, LV_OBJ_FLAG_HIDDEN);
+  toastShowTime = millis();
+}
 
 void setup() {
   esp_task_wdt_deinit();
@@ -81,7 +110,7 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println("\n========================================");
-  Serial.println("[BOOT] Star Trail v7.0");
+  Serial.println("[BOOT] Star Trail v8.0");
   Serial.println("========================================");
 
   if (!SPIFFS.begin(true))
@@ -100,15 +129,16 @@ void setup() {
   splash_show();
 
   wifi_init();
-  configTime(19800, 0, "pool.ntp.org"); // IST = UTC+5:30
+  // NTP time sync handled by wifi_manager.cpp
 
-  // BLE Media Controller
+  // BLE Media Controller + Notifications
   ble_media_init();
+  ble_notify_init();
 
   // OTA Updates (after WiFi)
   ota_init();
 
-  // Sensors (MPU9250 + QMC5883L via I2C master + BME280)
+  // Sensors (MPU9250 + AK8963 + BME280)
   if (sensors_init())
     Serial.println("[SENSORS] OK");
   else
@@ -116,8 +146,10 @@ void setup() {
 
   sensors_load_calibration();
 
-  // Gyro calibration takes 3s, matching splash progress bar
-  sensors_auto_calibrate_gyro();
+  // Auto-calibration on boot
+  sensors_auto_calibrate_gyro(); // 3s gyro cal
+  sensors_auto_calibrate_mag(8); // Quick mag cal if no saved data
+
   leds_set_mode(LED_MODE_NORMAL);
 
   // Init all widgets
@@ -126,9 +158,9 @@ void setup() {
   alttemp_init();
   clock_init();
   music_init();
+  gforce_init();
   sensorview_init();
   systemview_init();
-  calwidget_init();
 
   // Restore last widget from SPIFFS
   int savedWidget = 0;
@@ -136,8 +168,10 @@ void setup() {
   if (wf) {
     savedWidget = wf.parseInt();
     wf.close();
-    if (savedWidget < 0 || savedWidget >= NUM_WIDGETS)
+    if (savedWidget < 0 || savedWidget >= NUM_WIDGETS) {
       savedWidget = 0;
+      Serial.println("[UI] Saved widget out of range, resetting to Clock");
+    }
     Serial.printf("[UI] Restored widget: %s\n", wName[savedWidget]);
   }
   currentWidget = savedWidget;
@@ -157,11 +191,8 @@ void setup() {
   case W_MUSIC:
     music_show();
     break;
-  case W_SENSORS:
-    sensorview_show();
-    break;
-  case W_CALIBRATE:
-    calwidget_show();
+  case W_GFORCE:
+    gforce_show();
     break;
   }
   Serial.printf("[UI] %s (%d/%d)\n", wName[currentWidget], currentWidget + 1,
@@ -174,9 +205,20 @@ void setup() {
 
 void loop() {
   lv_timer_handler();
-  ota_handle(); // Check for OTA updates
+  ota_handle();
 
-  // ===== Touch gestures — both directions work =====
+  // === BLE notification toast ===
+  if (ble_notify_has_message()) {
+    showToast(ble_notify_get_message());
+    ble_notify_clear();
+  }
+  // Auto-hide toast after 4s
+  if (toastObj && toastShowTime > 0 && millis() - toastShowTime > 4000) {
+    lv_obj_add_flag(toastObj, LV_OBJ_FLAG_HIDDEN);
+    toastShowTime = 0;
+  }
+
+  // ===== Touch gestures =====
   uint8_t g = touch_get_gesture();
   if (g != 0 && !systemVisible) {
     switch (g) {
@@ -217,7 +259,7 @@ void loop() {
       } else if (millis() - touchStart > 2000) {
         clock_next_face();
         touchActive = false;
-        delay(500); // debounce
+        delay(500);
       }
     } else {
       touchActive = false;
@@ -239,21 +281,19 @@ void loop() {
     }
   }
 
-  // ===== Encoder button: short click = Play/Pause, 3s hold = System Menu =====
+  // ===== Encoder button: short click = Play/Pause, 3s hold = System =====
   static uint32_t btnDownTime = 0;
-  static bool btnHeld = false;       // True while button is down
-  static bool holdTriggered = false; // Prevents re-trigger
+  static bool btnHeld = false;
+  static bool holdTriggered = false;
   bool btnDown = encoder_button_pressed();
 
   if (btnDown && !btnHeld) {
-    // Rising edge: button just pressed
     btnDownTime = millis();
     btnHeld = true;
     holdTriggered = false;
   }
 
   if (btnDown && btnHeld && !holdTriggered && (millis() - btnDownTime > 3000)) {
-    // 3-second hold achieved
     holdTriggered = true;
     if (!systemVisible) {
       systemVisible = true;
@@ -261,7 +301,6 @@ void loop() {
       Serial.println("[UI] System overlay ON (3s hold)");
     } else {
       systemVisible = false;
-      // Re-show current widget
       switch (currentWidget) {
       case W_COMPASS:
         compass_show();
@@ -278,8 +317,8 @@ void loop() {
       case W_MUSIC:
         music_show();
         break;
-      case W_SENSORS:
-        sensorview_show();
+      case W_GFORCE:
+        gforce_show();
         break;
       }
       Serial.println("[UI] System overlay OFF (3s hold)");
@@ -287,10 +326,8 @@ void loop() {
   }
 
   if (!btnDown && btnHeld) {
-    // Falling edge: button released
     uint32_t held = millis() - btnDownTime;
     if (!holdTriggered && held < 1000) {
-      // Short click
       if (currentWidget == W_MUSIC && !systemVisible) {
         ble_media_play_pause();
         music_toggle_play();
@@ -316,19 +353,12 @@ void loop() {
   case W_MUSIC:
     music_update();
     break;
-  case W_SENSORS: {
-    int16_t mx, my, mz;
-    float ax, ay, az, gx, gy, gz;
-    sensors_get_mag_raw(&mx, &my, &mz);
+  case W_GFORCE: {
+    float ax, ay, az;
     sensors_get_accel(&ax, &ay, &az);
-    sensors_get_gyro(&gx, &gy, &gz);
-    sensorview_update(gH, gP, gR, gT, gA, gPr, mx, my, mz, ax, ay, az, gx, gy,
-                      gz);
+    gforce_update(ax, ay, az);
     break;
   }
-  case W_CALIBRATE:
-    calwidget_update();
-    break;
   }
   delay(5);
 }
@@ -350,11 +380,8 @@ void switchWidget(int dir) {
   case W_MUSIC:
     music_hide();
     break;
-  case W_SENSORS:
-    sensorview_hide();
-    break;
-  case W_CALIBRATE:
-    calwidget_hide();
+  case W_GFORCE:
+    gforce_hide();
     break;
   }
   currentWidget = (currentWidget + dir + NUM_WIDGETS) % NUM_WIDGETS;
@@ -374,16 +401,12 @@ void switchWidget(int dir) {
   case W_MUSIC:
     music_show();
     break;
-  case W_SENSORS:
-    sensorview_show();
-    break;
-  case W_CALIBRATE:
-    calwidget_show();
+  case W_GFORCE:
+    gforce_show();
     break;
   }
   Serial.printf("[UI] %s (%d/%d)\n", wName[currentWidget], currentWidget + 1,
                 NUM_WIDGETS);
-  // Save last widget to SPIFFS
   File wf = SPIFFS.open("/last_widget.txt", "w");
   if (wf) {
     wf.print(currentWidget);
@@ -405,13 +428,13 @@ void sensorTask(void *p) {
     if (millis() - lp > 500) {
       int16_t mx, my, mz;
       sensors_get_mag_raw(&mx, &my, &mz);
-      Serial.printf("[S] H:%.0f P:%.1f R:%.1f T:%.1f M:%d,%d,%d\n", gH, gP, gR,
-                    gT, mx, my, mz);
+      Serial.printf("[S] H:%.0f P:%.1f R:%.1f T:%.1f A:%.0f M:%d,%d,%d\n", gH,
+                    gP, gR, gT, gA, mx, my, mz);
       lp = millis();
     }
     if (calibrationMode)
       calibration_update();
-    vTaskDelayUntil(&lw, pdMS_TO_TICKS(20));
+    vTaskDelayUntil(&lw, pdMS_TO_TICKS(10));
   }
 }
 

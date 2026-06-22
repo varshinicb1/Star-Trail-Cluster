@@ -69,10 +69,28 @@ void calwidget_show() {
   lv_obj_set_style_text_align(lblMagRaw, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(lblMagRaw, LV_ALIGN_BOTTOM_MID, 0, -12);
 
-  // Auto-start calibration
-  calibration_start();
-  calibrationMode = true;
-  calActive = true;
+  // Don't auto-start - user taps to begin
+  calActive = false;
+  calibrationMode = false;
+  lv_label_set_text(lblStatus, "Tap to start\ncalibration");
+
+  // Tap handler to start calibration
+  lv_obj_add_flag(calScreen, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(
+      calScreen,
+      [](lv_event_t *e) {
+        if (!calActive) {
+          calibration_start();
+          calibrationMode = true;
+          calActive = true;
+          lv_label_set_text(lblStatus, "Rotate slowly\nin figure-8");
+          lv_obj_set_style_text_color(lblStatus, lv_color_hex(0x888888), 0);
+          lv_obj_set_style_text_font(lblStatus, &lv_font_montserrat_12, 0);
+          lv_arc_set_value(arcProgress, 0);
+          lv_label_set_text(lblPercent, "0%");
+        }
+      },
+      LV_EVENT_CLICKED, NULL);
 }
 
 void calwidget_hide() {

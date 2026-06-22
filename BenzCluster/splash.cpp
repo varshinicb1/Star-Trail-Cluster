@@ -1,13 +1,15 @@
 #include "splash.h"
 #include "benz_logo.h"
 #include "config.h"
+#include "illuminati_logo.h"
+#include "vw_logo.h"
 #include <Arduino.h>
+#include <SPIFFS.h>
 #include <lvgl.h>
 #include <math.h>
 #include <stdio.h>
 
 static lv_obj_t *splashScreen = NULL;
-static lv_obj_t *welcomeLabel = NULL;
 static lv_obj_t *progressBar = NULL;
 
 // Star trail particles
@@ -26,11 +28,25 @@ static void star_orbit_cb(void *obj, int32_t angle) {
   lv_obj_set_style_opa(s, opa, 0);
 }
 
-void splash_show() {
-  splashScreen = lv_obj_create(NULL);
-  lv_obj_set_style_bg_color(splashScreen, lv_color_hex(0x000000), 0);
-  lv_scr_load(splashScreen);
+// Check which splash theme to use: "star_trail" (default), "illuminati", "vw"
+static String getTheme() {
+  if (!SPIFFS.exists("/splash_theme.txt"))
+    return "star_trail";
+  File f = SPIFFS.open("/splash_theme.txt", "r");
+  if (!f)
+    return "star_trail";
+  String theme = f.readString();
+  f.close();
+  theme.trim();
+  theme.toLowerCase();
+  if (theme == "illuminati" || theme == "1")
+    return "illuminati";
+  if (theme == "vw" || theme == "2")
+    return "vw";
+  return "star_trail";
+}
 
+static void show_star_trail_splash() {
   // === Star Trail Particles ===
   uint32_t starColors[] = {0xFFFFFF, 0xDDDDFF, 0xBBBBFF, 0xAAAADD, 0x8888CC};
   for (int i = 0; i < NUM_STARS; i++) {
@@ -66,28 +82,74 @@ void splash_show() {
   lv_obj_set_style_text_color(brandLabel, lv_color_hex(0xC0C0C0), 0);
   lv_obj_set_style_text_letter_space(brandLabel, 6, 0);
   lv_obj_align(brandLabel, LV_ALIGN_CENTER, 0, 80);
+}
 
-  // Progress bar (3s gyro cal)
-  progressBar = lv_bar_create(splashScreen);
-  lv_obj_set_size(progressBar, 140, 4);
-  lv_obj_align(progressBar, LV_ALIGN_CENTER, 0, 110);
-  lv_obj_set_style_bg_color(progressBar, lv_color_hex(0x222222), LV_PART_MAIN);
-  lv_obj_set_style_bg_color(progressBar, lv_color_hex(0xFFFFFF),
-                            LV_PART_INDICATOR);
-  lv_obj_set_style_radius(progressBar, 2, LV_PART_MAIN);
-  lv_obj_set_style_radius(progressBar, 2, LV_PART_INDICATOR);
-  lv_bar_set_range(progressBar, 0, 100);
-  lv_bar_set_value(progressBar, 0, LV_ANIM_OFF);
+static void show_illuminati_splash() {
+  // Inverted-color logo with zoom-in animation
+  lv_obj_t *logoImg = lv_img_create(splashScreen);
+  lv_img_set_src(logoImg, &illuminati_logo_dsc);
+  lv_obj_align(logoImg, LV_ALIGN_CENTER, 0, 0);
+  lv_img_set_zoom(logoImg, 150);
 
   lv_anim_t a;
   lv_anim_init(&a);
-  lv_anim_set_var(&a, progressBar);
-  lv_anim_set_values(&a, 0, 100);
+  lv_anim_set_var(&a, logoImg);
+  lv_anim_set_values(&a, 150, 575);
   lv_anim_set_time(&a, 3000);
-  lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
-    lv_bar_set_value((lv_obj_t *)obj, v, LV_ANIM_ON);
-  });
+  lv_anim_set_exec_cb(
+      &a, [](void *obj, int32_t v) { lv_img_set_zoom((lv_obj_t *)obj, v); });
   lv_anim_start(&a);
+}
+
+static void show_vw_splash() {
+  // VW logo zoomed to fill screen (crops out text)
+  lv_obj_t *logoImg = lv_img_create(splashScreen);
+  lv_img_set_src(logoImg, &vw_logo_dsc);
+  lv_obj_align(logoImg, LV_ALIGN_CENTER, 0, 0);
+  lv_img_set_zoom(logoImg, 350);
+}
+
+void splash_show() {
+  splashScreen = lv_obj_create(NULL);
+
+  String theme = getTheme();
+  Serial.printf("[SPLASH] Theme: %s\n", theme.c_str());
+
+  lv_obj_set_style_bg_color(splashScreen, lv_color_hex(0x000000), 0);
+  lv_scr_load(splashScreen);
+
+  if (theme == "illuminati") {
+    show_illuminati_splash();
+  } else if (theme == "vw") {
+    show_vw_splash();
+  } else {
+    show_star_trail_splash();
+  }
+
+  // Progress bar (3s gyro cal) - only on star trail
+  if (theme == "star_trail") {
+    progressBar = lv_bar_create(splashScreen);
+    lv_obj_set_size(progressBar, 140, 4);
+    lv_obj_align(progressBar, LV_ALIGN_CENTER, 0, 110);
+    lv_obj_set_style_bg_color(progressBar, lv_color_hex(0x222222),
+                              LV_PART_MAIN);
+    lv_obj_set_style_bg_color(progressBar, lv_color_hex(0xFFFFFF),
+                              LV_PART_INDICATOR);
+    lv_obj_set_style_radius(progressBar, 2, LV_PART_MAIN);
+    lv_obj_set_style_radius(progressBar, 2, LV_PART_INDICATOR);
+    lv_bar_set_range(progressBar, 0, 100);
+    lv_bar_set_value(progressBar, 0, LV_ANIM_OFF);
+
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, progressBar);
+    lv_anim_set_values(&a, 0, 100);
+    lv_anim_set_time(&a, 3000);
+    lv_anim_set_exec_cb(&a, [](void *obj, int32_t v) {
+      lv_bar_set_value((lv_obj_t *)obj, v, LV_ANIM_ON);
+    });
+    lv_anim_start(&a);
+  }
 
   lv_timer_handler();
 }

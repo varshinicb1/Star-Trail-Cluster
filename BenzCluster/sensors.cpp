@@ -24,12 +24,18 @@
 #define MPU9250_I2C_MST_STATUS 0x36
 #define MPU9250_EXT_SENS_DATA_00 0x49
 
-// QMC5883L registers
-#define QMC5883L_ADDR 0x0D
-#define QMC5883L_DATA_REG 0x00
-#define QMC5883L_STATUS_REG 0x06
-#define QMC5883L_CTRL1_REG 0x09
-#define QMC5883L_SETRESET_REG 0x0B
+// AK8963 Magnetometer (inside MPU9250)
+#define AK8963_ADDR 0x0C
+#define AK8963_WIA 0x00
+#define AK8963_ST1 0x02
+#define AK8963_HXL 0x03
+#define AK8963_ST2 0x09
+#define AK8963_CNTL1 0x0A
+#define AK8963_CNTL2 0x0B
+#define AK8963_ASAX 0x10
+
+// AK8963 sensitivity adjustment values (from fuse ROM)
+static float magASA[3] = {1.0f, 1.0f, 1.0f};
 
 // ============== BME280 Registers ==============
 #define BME280_CHIP_ID 0xD0
@@ -52,7 +58,7 @@ static int16_t dig_P2, dig_P3, dig_P4, dig_P5, dig_P6, dig_P7, dig_P8, dig_P9;
 // ============== Sensor Flags ==============
 static bool mpu9250_found = false;
 static bool bme280_found = false;
-static bool qmc5883l_found = false;
+static bool ak8963_found = false;
 
 // ============== Sensor Data ==============
 static float accelX, accelY, accelZ;
@@ -67,8 +73,16 @@ static float temperature = 25.0f, pressure = 1013.25f,
 static float headingFiltered = 0;
 static float pitchFiltered = 0;
 static float rollFiltered = 0;
+
+// Auto-calibration offsets (computed from first 100 samples at boot)
+static float pitchOffset = 0, rollOffset = 0;
+static float pitchAccum = 0, rollAccum = 0;
+static int calCount = 0;
+static bool calDone = false;
+#define CAL_SAMPLES 100
 static float tempFiltered = 25.0f;
-static const float ALPHA = 0.1f; // Low-pass filter coefficient
+static const float ALPHA =
+    0.2f; // Low-pass filter coefficient (faster response)
 
 // ============== I2C Helpers ==============
 static uint8_t readByte(uint8_t addr, uint8_t reg) {
@@ -98,7 +112,6 @@ static void readBytes(uint8_t addr, uint8_t reg, uint8_t count, uint8_t *dest) {
 
 // ============== MPU9250 Functions ==============
 static bool mag_found = false;
-static uint8_t mag_addr = QMC5883L_ADDR; // Will be updated if found elsewhere
 
 // ============== I2C Master Helpers ==============
 // Write a single byte to an external I2C slave via MPU9250 SLV4 (single-shot)
@@ -165,46 +178,51 @@ static bool initMPU9250() {
   writeByte(MPU9250_ADDR, 0x1C, 0x00); // ACCEL_CONFIG: ±2g
   writeByte(MPU9250_ADDR, 0x1D, 0x03); // ACCEL_CONFIG2: DLPF 41Hz
 
-  // Disable I2C master mode (keep QMC5883L accessible on main bus)
-  writeByte(MPU9250_ADDR, MPU9250_USER_CTRL, 0x00);   // No I2C master
-  writeByte(MPU9250_ADDR, MPU9250_INT_PIN_CFG, 0x20); // LATCH_INT_EN only
+  // Enable I2C bypass mode — exposes AK8963 at 0x0C on main I2C bus
+  writeByte(MPU9250_ADDR, MPU9250_USER_CTRL, 0x00);   // Disable I2C master
+  writeByte(MPU9250_ADDR, MPU9250_INT_PIN_CFG, 0x02); // BYPASS_EN
   delay(10);
 
-  Serial.println("[IMU] Configured (no I2C master, QMC5883L on main bus)");
+  Serial.println("[IMU] Configured (bypass mode for AK8963)");
 
-  // === Detect QMC5883L directly on the main I2C bus ===
-  Wire.beginTransmission(QMC5883L_ADDR);
+  // === Detect AK8963 magnetometer at 0x0C ===
+  Wire.beginTransmission(AK8963_ADDR);
   uint8_t err = Wire.endTransmission();
   if (err == 0) {
-    uint8_t chipId = readByte(QMC5883L_ADDR, 0x0D); // Chip ID register
-    Serial.printf("[MAG] QMC5883L detected at 0x0D (chip ID: 0x%02X)\n",
-                  chipId);
+    uint8_t wia = readByte(AK8963_ADDR, AK8963_WIA);
+    Serial.printf("[MAG] AK8963 WIA: 0x%02X (expected 0x48)\n", wia);
 
-    qmc5883l_found = true;
-    mag_found = true;
-    mag_addr = QMC5883L_ADDR;
+    if (wia == 0x48) {
+      ak8963_found = true;
+      mag_found = true;
 
-    // Configure QMC5883L: soft reset first
-    writeByte(QMC5883L_ADDR, 0x0A, 0x80); // Soft reset
-    delay(50);
-    writeByte(QMC5883L_ADDR, QMC5883L_SETRESET_REG, 0x01); // SET/RESET period
-    delay(10);
-    writeByte(QMC5883L_ADDR, QMC5883L_CTRL1_REG,
-              0x01); // Continuous, 10Hz, 2G, OSR512
-    delay(50);
+      // Power down before changing mode
+      writeByte(AK8963_ADDR, AK8963_CNTL1, 0x00);
+      delay(10);
 
-    // Verify config
-    uint8_t r09 = readByte(QMC5883L_ADDR, QMC5883L_CTRL1_REG);
-    Serial.printf("[MAG] QMC5883L R09 readback: 0x%02X (expected 0x01)\n", r09);
+      // Read sensitivity adjustment values from fuse ROM
+      writeByte(AK8963_ADDR, AK8963_CNTL1, 0x0F); // Fuse ROM access mode
+      delay(10);
+      uint8_t asa[3];
+      readBytes(AK8963_ADDR, AK8963_ASAX, 3, asa);
+      magASA[0] = ((float)(asa[0] - 128) / 256.0f) + 1.0f;
+      magASA[1] = ((float)(asa[1] - 128) / 256.0f) + 1.0f;
+      magASA[2] = ((float)(asa[2] - 128) / 256.0f) + 1.0f;
+      Serial.printf("[MAG] ASA: X=%.3f Y=%.3f Z=%.3f\n", magASA[0], magASA[1],
+                    magASA[2]);
 
-    if (r09 == 0x01) {
-      Serial.println("[MAG] QMC5883L configured! Continuous mode active.");
+      // Power down, then set 16-bit output + continuous mode 2 (100Hz)
+      writeByte(AK8963_ADDR, AK8963_CNTL1, 0x00);
+      delay(10);
+      writeByte(AK8963_ADDR, AK8963_CNTL1, 0x16); // 16-bit, 100Hz continuous
+      delay(10);
+
+      Serial.println("[MAG] AK8963 configured: 16-bit, 100Hz continuous");
     } else {
-      Serial.println(
-          "[MAG] QMC5883L config write may have failed. Reading data anyway.");
+      Serial.println("[MAG] AK8963 WIA mismatch, magnetometer disabled");
     }
   } else {
-    Serial.printf("[MAG] QMC5883L not found at 0x0D (err=%d)\n", err);
+    Serial.printf("[MAG] AK8963 not found at 0x0C (err=%d)\n", err);
     Serial.println("[MAG] Heading will use gyro integration (drift expected)");
   }
 
@@ -260,17 +278,30 @@ static void readMPU9250() {
   int16_t ax = (rawData[0] << 8) | rawData[1];
   int16_t ay = (rawData[2] << 8) | rawData[3];
   int16_t az = (rawData[4] << 8) | rawData[5];
-  accelX = ax / 16384.0f;
-  accelY = ay / 16384.0f;
-  accelZ = az / 16384.0f;
+  // Raw accel in chip frame
+  float rawAX = ax / 16384.0f;
+  float rawAY = ay / 16384.0f;
+  float rawAZ = az / 16384.0f;
+
+  // Axis remap for VERTICAL mounting (display facing driver, bottom down)
+  // Chip Y-axis points up when flat → becomes Z (up) when vertical
+  // Chip Z-axis points toward user when flat → becomes -Y when vertical
+  accelX = rawAX;
+  accelY = -rawAZ;
+  accelZ = rawAY;
 
   // Gyroscope (±250 dps = 131 LSB/dps) — subtract bias
   int16_t gx = (rawData[8] << 8) | rawData[9];
   int16_t gy = (rawData[10] << 8) | rawData[11];
   int16_t gz = (rawData[12] << 8) | rawData[13];
-  gyroX = gx / 131.0f - gyroBiasX;
-  gyroY = gy / 131.0f - gyroBiasY;
-  gyroZ = gz / 131.0f - gyroBiasZ;
+  float rawGX = gx / 131.0f - gyroBiasX;
+  float rawGY = gy / 131.0f - gyroBiasY;
+  float rawGZ = gz / 131.0f - gyroBiasZ;
+
+  // Same axis remap for gyro
+  gyroX = rawGX;
+  gyroY = -rawGZ;
+  gyroZ = rawGY;
 
   // Delta time
   unsigned long now = micros();
@@ -353,13 +384,28 @@ static void readMPU9250() {
   q2 *= recipNorm;
   q3 *= recipNorm;
 
-  // Convert quaternion to Euler angles
-  pitch = asin(-2.0f * (q1 * q3 - q0 * q2)) * RAD_TO_DEG;
-  roll = atan2(2.0f * (q0 * q1 + q2 * q3), 1.0f - 2.0f * (q1 * q1 + q2 * q2)) *
-         RAD_TO_DEG;
-  // Yaw from quaternion (used when no magnetometer)
-  // heading = atan2(2.0f * (q0*q3 + q1*q2), 1.0f - 2.0f * (q2*q2 + q3*q3)) *
-  // RAD_TO_DEG;
+  // Convert quaternion to Euler angles (raw, before calibration)
+  float rawPitch = asin(-2.0f * (q1 * q3 - q0 * q2)) * RAD_TO_DEG;
+  float rawRoll =
+      atan2(2.0f * (q0 * q1 + q2 * q3), 1.0f - 2.0f * (q1 * q1 + q2 * q2)) *
+      RAD_TO_DEG;
+
+  // Auto-calibrate: average first CAL_SAMPLES readings as zero reference
+  if (!calDone) {
+    pitchAccum += rawPitch;
+    rollAccum += rawRoll;
+    calCount++;
+    if (calCount >= CAL_SAMPLES) {
+      pitchOffset = pitchAccum / CAL_SAMPLES;
+      rollOffset = rollAccum / CAL_SAMPLES;
+      calDone = true;
+      Serial.printf("[CAL] Pitch offset: %.2f, Roll offset: %.2f\n",
+                    pitchOffset, rollOffset);
+    }
+  }
+
+  pitch = rawPitch - pitchOffset;
+  roll = rawRoll - rollOffset;
 }
 
 static void readMagnetometer() {
@@ -379,22 +425,41 @@ static void readMagnetometer() {
   if (!mag_found)
     return;
 
-  // Read QMC5883L directly from main I2C bus
-  uint8_t rawData[6];
-  readBytes(QMC5883L_ADDR, QMC5883L_DATA_REG, 6, rawData);
+  // Check AK8963 data-ready (ST1 bit 0)
+  uint8_t st1 = readByte(AK8963_ADDR, AK8963_ST1);
+  if (!(st1 & 0x01))
+    return; // DRDY not set
 
-  // QMC5883L: Little-endian (LSB first)
+  // Read 7 bytes: HXL..HZH + ST2 (MUST read ST2 to unlock next measurement)
+  uint8_t rawData[7];
+  readBytes(AK8963_ADDR, AK8963_HXL, 7, rawData);
+
+  uint8_t st2 = rawData[6];
+  // Check for magnetic sensor overflow
+  if (st2 & 0x08)
+    return; // HOFL bit set, data invalid
+
+  // AK8963: Little-endian (LSB first)
   int16_t rx = (int16_t)((rawData[1] << 8) | rawData[0]);
   int16_t ry = (int16_t)((rawData[3] << 8) | rawData[2]);
   int16_t rz = (int16_t)((rawData[5] << 8) | rawData[4]);
 
+  // Reject saturated readings (AK8963 range: -32760 to 32760)
+  if (abs(rx) >= 32760 || abs(ry) >= 32760 || abs(rz) >= 32760)
+    return;
+
   if (rx != 0 || ry != 0 || rz != 0) {
+    // Apply sensitivity adjustment: Hadj = H * ((ASA-128)/256 + 1)
     magRawX = rx;
     magRawY = ry;
     magRawZ = rz;
-    magX = (magRawX - magOffsetX) * magScaleX;
-    magY = (magRawY - magOffsetY) * magScaleY;
-    magZ = (magRawZ - magOffsetZ) * magScaleZ;
+    float adjX = rx * magASA[0];
+    float adjY = ry * magASA[1];
+    float adjZ = rz * magASA[2];
+
+    magX = (adjX - magOffsetX) * magScaleX;
+    magY = (adjY - magOffsetY) * magScaleY;
+    magZ = (adjZ - magOffsetZ) * magScaleZ;
 
     // Tilt-compensated heading
     float cosRoll = cos(roll * DEG_TO_RAD);
@@ -461,7 +526,7 @@ static bool initBME280() {
 }
 
 static void readBME280() {
-  uint8_t rawData[6];
+  uint8_t rawData[8]; // Read all 8 bytes (press + temp + hum)
   readBytes(BME280_ADDR, BME280_PRESS_MSB, 6, rawData);
 
   int32_t adc_P = ((int32_t)rawData[0] << 12) | ((int32_t)rawData[1] << 4) |
@@ -469,7 +534,19 @@ static void readBME280() {
   int32_t adc_T = ((int32_t)rawData[3] << 12) | ((int32_t)rawData[4] << 4) |
                   (rawData[5] >> 4);
 
-  // Temperature compensation
+  // Reject obviously bad reads (I2C bus failure)
+  if (adc_T == 0 || adc_T == 0xFFFFF || adc_P == 0 || adc_P == 0xFFFFF) {
+    static int failCount = 0;
+    failCount++;
+    if (failCount > 5) {
+      Serial.println("[BME280] Re-initializing after repeated read failures");
+      initBME280();
+      failCount = 0;
+    }
+    return; // Keep previous good values
+  }
+
+  // Temperature compensation (Bosch reference)
   int32_t var1 =
       ((((adc_T >> 3) - ((int32_t)dig_T1 << 1))) * ((int32_t)dig_T2)) >> 11;
   int32_t var2 = (((((adc_T >> 4) - ((int32_t)dig_T1)) *
@@ -478,8 +555,12 @@ static void readBME280() {
                   ((int32_t)dig_T3)) >>
                  14;
   int32_t t_fine = var1 + var2;
-  float rawTemp = (t_fine * 5 + 128) >> 8;
-  rawTemp /= 100.0f;
+  float rawTemp = (float)((t_fine * 5 + 128) >> 8) / 100.0f;
+
+  // Sanity check: BME280 range is -40 to +85°C
+  if (rawTemp < -40.0f || rawTemp > 85.0f) {
+    return; // Reject out-of-range values
+  }
 
   // Low-pass filter for temperature
   tempFiltered = tempFiltered * 0.9f + rawTemp * 0.1f;
@@ -503,9 +584,29 @@ static void readBME280() {
     pressure = (float)p / 256.0f / 100.0f;
   }
 
-  // Calculate altitude in feet
-  altitude = 44330.0f * (1.0f - pow(pressure / seaLevelPressure, 0.1903f));
-  altitude *= 3.28084f;
+  // Altitude (m ASL) — uses weather API SLP if available, else calibrated from
+  // 920m
+  if (pressure > 0) {
+    extern float wifi_get_sea_level_pressure();
+    float weatherSLP = wifi_get_sea_level_pressure();
+
+    static float calibratedSLP = 0;
+    if (calibratedSLP == 0 && pressure > 800 && pressure < 1200) {
+      calibratedSLP =
+          pressure / pow(1.0f - LOCAL_ELEVATION_METERS / 44330.0f, 5.255f);
+      Serial.printf("[ALT] BME280-cal SLP: %.2f hPa\n", calibratedSLP);
+    }
+
+    float slp = (weatherSLP > 900 && weatherSLP < 1100) ? weatherSLP
+                : (calibratedSLP > 0)                   ? calibratedSLP
+                                                        : 1013.25f;
+    float rawAlt = 44330.0f * (1.0f - pow(pressure / slp, 0.1903f));
+    static float altFiltered = -9999;
+    if (altFiltered < -9000)
+      altFiltered = rawAlt;
+    altFiltered = altFiltered * 0.85f + rawAlt * 0.15f;
+    altitude = altFiltered;
+  }
 }
 
 // ============== I2C Bus Scanner ==============
@@ -579,7 +680,7 @@ bool sensors_init() {
   Serial.println("========================================");
   Serial.printf("[SENSORS] MPU9250:  %s\n", mpu9250_found ? "OK" : "NOT FOUND");
   Serial.printf("[SENSORS] MAG:      %s (%s)\n", mag_found ? "OK" : "NOT FOUND",
-                qmc5883l_found ? "QMC5883L" : "AK8963");
+                ak8963_found ? "AK8963" : "none");
   Serial.printf("[SENSORS] BME280:   %s\n", bme280_found ? "OK" : "NOT FOUND");
   Serial.println("========================================");
 
@@ -723,4 +824,89 @@ bool sensors_load_calibration() {
                 gyroOffsetX, gyroOffsetY, gyroOffsetZ, magOffsetX, magOffsetY,
                 magOffsetZ);
   return true;
+}
+
+// ============== Auto Mag Calibration ==============
+void sensors_auto_calibrate_mag(int durationSec) {
+  if (!mag_found) {
+    Serial.println("[MAG_CAL] No magnetometer found, skipping");
+    return;
+  }
+
+  // Skip if we already have valid calibration
+  if (magOffsetX != 0.0f || magOffsetY != 0.0f || magOffsetZ != 0.0f) {
+    Serial.println("[MAG_CAL] Existing calibration found, skipping auto-cal");
+    return;
+  }
+
+  Serial.printf("[MAG_CAL] Running %ds auto-calibration...\n", durationSec);
+
+  int16_t minX = 32767, maxX = -32768;
+  int16_t minY = 32767, maxY = -32768;
+  int16_t minZ = 32767, maxZ = -32768;
+  int samples = 0;
+  unsigned long start = millis();
+
+  while (millis() - start < (unsigned long)(durationSec * 1000)) {
+    // Check AK8963 DRDY
+    uint8_t st = readByte(AK8963_ADDR, AK8963_ST1);
+    if (st & 0x01) {
+      uint8_t rawData[7];
+      readBytes(AK8963_ADDR, AK8963_HXL, 7, rawData);
+      uint8_t st2 = rawData[6];
+      if (st2 & 0x08) {
+        delay(10);
+        continue;
+      } // HOFL overflow
+      int16_t rx = (int16_t)((rawData[1] << 8) | rawData[0]);
+      int16_t ry = (int16_t)((rawData[3] << 8) | rawData[2]);
+      int16_t rz = (int16_t)((rawData[5] << 8) | rawData[4]);
+
+      // Reject saturated values
+      if (abs(rx) < 32760 && abs(ry) < 32760 && abs(rz) < 32760 &&
+          (rx != 0 || ry != 0 || rz != 0)) {
+        if (rx < minX)
+          minX = rx;
+        if (rx > maxX)
+          maxX = rx;
+        if (ry < minY)
+          minY = ry;
+        if (ry > maxY)
+          maxY = ry;
+        if (rz < minZ)
+          minZ = rz;
+        if (rz > maxZ)
+          maxZ = rz;
+        samples++;
+      }
+    }
+    delay(20);
+  }
+
+  if (samples < 50) {
+    Serial.printf("[MAG_CAL] Only %d samples, not enough data\n", samples);
+    return;
+  }
+
+  // Hard-iron offsets
+  magOffsetX = (maxX + minX) / 2.0f;
+  magOffsetY = (maxY + minY) / 2.0f;
+  magOffsetZ = (maxZ + minZ) / 2.0f;
+
+  // Soft-iron scale (guard against zero range)
+  float rangeX = max(1.0f, (maxX - minX) / 2.0f);
+  float rangeY = max(1.0f, (maxY - minY) / 2.0f);
+  float rangeZ = max(1.0f, (maxZ - minZ) / 2.0f);
+  float avgRange = (rangeX + rangeY + rangeZ) / 3.0f;
+  magScaleX = avgRange / rangeX;
+  magScaleY = avgRange / rangeY;
+  magScaleZ = avgRange / rangeZ;
+
+  Serial.printf("[MAG_CAL] Done (%d samples): offset(%.1f,%.1f,%.1f) "
+                "scale(%.3f,%.3f,%.3f)\n",
+                samples, magOffsetX, magOffsetY, magOffsetZ, magScaleX,
+                magScaleY, magScaleZ);
+
+  // Save to SPIFFS
+  sensors_save_calibration();
 }
