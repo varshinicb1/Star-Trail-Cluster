@@ -122,68 +122,79 @@ class IlluminatiLogoPainter extends CustomPainter {
       old.color != color || old.glowColor != glowColor;
 }
 
-class DRLettersPainter extends CustomPainter {
+/// Premium brushed-chrome three-point star inside a dual ring — the flagship
+/// "Benz" emblem, brand-inspired (not the trademarked Mercedes logo).
+class BenzStarPainter extends CustomPainter {
   final Color color;
   final Color? glowColor;
 
-  DRLettersPainter({required this.color, this.glowColor});
+  BenzStarPainter({required this.color, this.glowColor});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final r = math.min(size.width, size.height) / 2;
+    final rOuter = r * 0.90;
+    final rInner = r * 0.62;
 
     if (glowColor != null) {
       canvas.drawCircle(
         center,
-        r * 0.65,
+        rOuter,
         Paint()
-          ..color = glowColor!.withAlpha(25)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+          ..color = glowColor!.withAlpha(30)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
       );
     }
 
-    final paint = Paint()
+    // dual concentric rings
+    canvas.drawCircle(
+      center,
+      rOuter,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.05,
+    );
+    canvas.drawCircle(
+      center,
+      rInner,
+      Paint()
+        ..color = color.withAlpha(150)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.03,
+    );
+
+    // three tapered wedges forming the tri-star
+    final fill = Paint()
       ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final lx = center.dx - r * 0.35;
-    final ty = center.dy - r * 0.50;
-    final by = center.dy + r * 0.50;
-    final cpx = center.dx + r * 0.15;
-
-    final d = Path()
-      ..moveTo(lx, ty)
-      ..lineTo(lx, by)
-      ..moveTo(lx, ty)
-      ..cubicTo(cpx, ty - r * 0.03, cpx + r * 0.2, center.dy - r * 0.08, cpx + r * 0.2, center.dy)
-      ..cubicTo(cpx + r * 0.2, center.dy + r * 0.08, cpx, by + r * 0.03, lx, by);
-    canvas.drawPath(d, paint);
-
-    final dot = center.dx - r * 0.28;
-    final dotY = ty - r * 0.08;
-    canvas.drawCircle(Offset(dot, dotY), r * 0.07, Paint()..color = color);
-
-    final rLetter = Path()
-      ..moveTo(center.dx - r * 0.02, ty + r * 0.20)
-      ..cubicTo(
-        center.dx + r * 0.25,
-        ty + r * 0.15,
-        center.dx + r * 0.30,
-        center.dy - r * 0.10,
-        center.dx + r * 0.05,
-        center.dy,
-      )
-      ..moveTo(center.dx, center.dy)
-      ..lineTo(center.dx + r * 0.25, by - r * 0.10);
-    canvas.drawPath(rLetter, paint);
+      ..style = PaintingStyle.fill;
+    final half = 12 * math.pi / 180;
+    for (int i = 0; i < 3; i++) {
+      final a = -math.pi / 2 + i * 2 * math.pi / 3;
+      final tip = Offset(center.dx + math.cos(a) * rInner, center.dy + math.sin(a) * rInner);
+      final l = Offset(
+        center.dx + math.cos(a - half) * rInner * 0.30,
+        center.dy + math.sin(a - half) * rInner * 0.30,
+      );
+      final rr = Offset(
+        center.dx + math.cos(a + half) * rInner * 0.30,
+        center.dy + math.sin(a + half) * rInner * 0.30,
+      );
+      final wedge = Path()
+        ..moveTo(tip.dx, tip.dy)
+        ..lineTo(l.dx, l.dy)
+        ..lineTo(center.dx, center.dy)
+        ..lineTo(rr.dx, rr.dy)
+        ..close();
+      canvas.drawPath(wedge, fill);
+    }
+    // centre hub
+    canvas.drawCircle(center, rInner * 0.14, fill);
   }
 
   @override
-  bool shouldRepaint(covariant DRLettersPainter old) =>
+  bool shouldRepaint(covariant BenzStarPainter old) =>
       old.color != color || old.glowColor != glowColor;
 }
 
@@ -202,12 +213,12 @@ class ThemeLogo extends StatelessWidget {
 
     CustomPainter painter;
     switch (context.watch<ThemeProvider>().mode) {
+      case AppThemeMode.benz:
+        painter = BenzStarPainter(color: logoColor, glowColor: glow);
       case AppThemeMode.starTrail:
         painter = StarTrailLogoPainter(color: logoColor, glowColor: glow);
       case AppThemeMode.illuminati:
         painter = IlluminatiLogoPainter(color: logoColor, glowColor: glow);
-      case AppThemeMode.neutral:
-        painter = DRLettersPainter(color: logoColor, glowColor: glow);
     }
 
     return SizedBox(

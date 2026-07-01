@@ -117,12 +117,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'DR',
+                        'STAR TRAIL',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 54,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2,
+                          fontSize: 40,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 4,
                           height: 1.1,
                         ),
                       ),
@@ -259,7 +259,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           Navigator.pushReplacementNamed(context, '/home'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: tp.theme.primary,
-                        foregroundColor: Colors.white,
+                        foregroundColor: tp.theme.onPrimary,
                         elevation: 0,
                         shadowColor: tp.theme.glow?.withAlpha(80),
                         shape: RoundedRectangleBorder(
@@ -288,23 +288,23 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   String _themeLabel(AppThemeMode mode) {
     switch (mode) {
+      case AppThemeMode.benz:
+        return 'Benz';
       case AppThemeMode.starTrail:
         return 'Star Trail';
       case AppThemeMode.illuminati:
         return 'Illuminati';
-      case AppThemeMode.neutral:
-        return 'DR';
     }
   }
 }
 
 CustomPainter _logoPainter(AppThemeMode mode, Color color) {
   switch (mode) {
+    case AppThemeMode.benz:
+      return BenzStarPainter(color: color, glowColor: color);
     case AppThemeMode.starTrail:
       return StarTrailLogoPainter(color: color, glowColor: color);
     case AppThemeMode.illuminati:
       return IlluminatiLogoPainter(color: color, glowColor: color);
-    case AppThemeMode.neutral:
-      return DRLettersPainter(color: color, glowColor: color);
   }
 }
