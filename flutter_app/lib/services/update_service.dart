@@ -21,7 +21,7 @@ class AppUpdateInfo {
 }
 
 class UpdateService extends ChangeNotifier {
-  String githubRepo = 'edgehax/star_trail';
+  String githubRepo = 'varshinicb1/Star-Trail-Cluster';
 
   AppUpdateInfo? _latestUpdate;
   bool _checking = false;
