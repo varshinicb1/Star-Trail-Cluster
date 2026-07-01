@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/device_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/glass_container.dart';
 
 const _timeoutOptions = ['15s', '30s', '1m', '2m', '5m'];
 const _timeoutValues = [15, 30, 60, 120, 300];
+const _timeoutIcons = [Icons.timer_outlined, Icons.timer_outlined, Icons.timer, Icons.timer, Icons.timer_sharp];
 
 class SystemScreen extends StatefulWidget {
   const SystemScreen({super.key});
@@ -23,30 +25,14 @@ class _SystemScreenState extends State<SystemScreen> {
   bool _sending = false;
 
   @override
-  void dispose() {
-    _ssidController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
+  void dispose() { _ssidController.dispose(); _passwordController.dispose(); super.dispose(); }
 
   Future<void> _connectWiFi() async {
     final host = _ssidController.text.trim();
-    if (host.isEmpty) {
-      setState(() => _wifiStatus = 'Enter an IP address');
-      return;
-    }
-    setState(() {
-      _wifiConnecting = true;
-      _wifiStatus = null;
-    });
-    final svc = context.read<DeviceService>();
-    final ok = await svc.connectWiFi(host);
-    if (mounted) {
-      setState(() {
-        _wifiConnecting = false;
-        _wifiStatus = ok ? 'Connected' : 'Connection failed';
-      });
-    }
+    if (host.isEmpty) { setState(() => _wifiStatus = 'Enter an IP address'); return; }
+    setState(() { _wifiConnecting = true; _wifiStatus = null; });
+    final ok = await context.read<DeviceService>().connectWiFi(host);
+    if (mounted) setState(() { _wifiConnecting = false; _wifiStatus = ok ? 'Connected' : 'Connection failed'; });
   }
 
   Future<void> _reboot() async {
@@ -57,28 +43,15 @@ class _SystemScreenState extends State<SystemScreen> {
         final t = context.read<ThemeProvider>().theme;
         return AlertDialog(
           backgroundColor: t.card,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text('Reboot Device'),
-          content: const Text(
-            'Are you sure you want to reboot the device?',
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Text('Reboot Device', style: TextStyle(color: t.textPrimary)),
+          content: Text('Are you sure you want to reboot the device?', style: TextStyle(color: t.textSecondary)),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel')),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: t.error,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text('Reboot'),
+              style: ElevatedButton.styleFrom(backgroundColor: t.error, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              child: Text('Reboot'),
             ),
           ],
         );
@@ -86,35 +59,19 @@ class _SystemScreenState extends State<SystemScreen> {
     );
     if (confirmed == true) {
       await svc.sendCommand('reboot');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Reboot command sent'),
-            backgroundColor: context.read<ThemeProvider>().theme.warning,
-          ),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Reboot command sent'), backgroundColor: context.read<ThemeProvider>().theme.warning));
     }
   }
 
   Future<void> _apply() async {
     setState(() => _sending = true);
     final svc = context.read<DeviceService>();
-    final cmds = [
-      'brightness=${_brightness.toInt()}',
-      'timeout=${_timeoutValues[_timeoutIndex]}',
-    ];
-    for (final cmd in cmds) {
+    for (final cmd in ['brightness=${_brightness.toInt()}', 'timeout=${_timeoutValues[_timeoutIndex]}']) {
       await svc.sendCommand(cmd);
     }
     if (mounted) {
       setState(() => _sending = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('System settings applied'),
-          backgroundColor: context.read<ThemeProvider>().theme.success,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('System settings applied'), backgroundColor: context.read<ThemeProvider>().theme.success));
     }
   }
 
@@ -122,57 +79,28 @@ class _SystemScreenState extends State<SystemScreen> {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().theme;
     return Scaffold(
+      backgroundColor: theme.surface,
       appBar: AppBar(
-        title: const Text('System Settings'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: Text('SYSTEM', style: TextStyle(fontSize: 13, letterSpacing: 3, fontWeight: FontWeight.w300, color: theme.textMuted)),
+        leading: IconButton(icon: Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16),
         children: [
           _sectionLabel(theme, 'DISPLAY BRIGHTNESS'),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: theme.card,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: theme.cardBorder),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.brightness_low, color: theme.textMuted, size: 18),
-                Expanded(
-                  child: Slider(
-                    value: _brightness,
-                    min: 0,
-                    max: 100,
-                    divisions: 100,
-                    onChanged: (v) => setState(() => _brightness = v),
-                  ),
-                ),
-                Icon(Icons.brightness_high, color: theme.textMuted, size: 18),
-                SizedBox(
-                  width: 36,
-                  child: Text(
-                    '${_brightness.toInt()}%',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: theme.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          SizedBox(height: 10),
+          GlassContainer(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(children: [
+              Icon(Icons.brightness_low, color: theme.textMuted, size: 18),
+              Expanded(child: Slider(value: _brightness, min: 0, max: 100, divisions: 100, onChanged: (v) => setState(() => _brightness = v))),
+              Icon(Icons.brightness_high, color: theme.textMuted, size: 18),
+              SizedBox(width: 36, child: Text('${_brightness.toInt()}%', textAlign: TextAlign.right, style: TextStyle(color: theme.primary, fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'monospace'))),
+            ]),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           _sectionLabel(theme, 'SCREEN TIMEOUT'),
-          const SizedBox(height: 8),
+          SizedBox(height: 10),
           Row(
             children: List.generate(_timeoutOptions.length, (i) {
               final selected = _timeoutIndex == i;
@@ -180,267 +108,120 @@ class _SystemScreenState extends State<SystemScreen> {
                 child: GestureDetector(
                   onTap: () => setState(() => _timeoutIndex = i),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                    ),
+                    duration: Duration(milliseconds: 250),
+                    margin: EdgeInsets.symmetric(horizontal: 4),
+                    padding: EdgeInsets.symmetric(vertical: 14),
                     decoration: BoxDecoration(
-                      color: selected
-                          ? theme.primary.withAlpha(25)
-                          : theme.card,
+                      color: selected ? theme.primary.withAlpha(25) : theme.card,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: selected ? theme.primary : theme.cardBorder,
-                        width: selected ? 2 : 1,
-                      ),
+                      border: Border.all(color: selected ? theme.primary : theme.cardBorder, width: selected ? 2 : 1),
                     ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          _timeoutIcon(i),
-                          color: selected
-                              ? theme.primary
-                              : theme.textMuted,
-                          size: 22,
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _timeoutOptions[i],
-                          style: TextStyle(
-                            color: selected
-                                ? theme.primary
-                                : theme.textSecondary,
-                            fontSize: 11,
-                            fontWeight: selected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: Column(children: [
+                      Icon(_timeoutIcons[i], color: selected ? theme.primary : theme.textMuted, size: 22),
+                      SizedBox(height: 6),
+                      Text(_timeoutOptions[i], style: TextStyle(color: selected ? theme.primary : theme.textSecondary, fontSize: 11, fontWeight: selected ? FontWeight.w600 : FontWeight.w400)),
+                    ]),
                   ),
                 ),
               );
             }),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           _sectionLabel(theme, 'WIFI SETTINGS'),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.card,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: theme.cardBorder),
-            ),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _ssidController,
-                  style: TextStyle(color: theme.textPrimary, fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: 'SSID / IP Address',
-                    prefixIcon: Icon(Icons.wifi, color: theme.textMuted, size: 20),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  style: TextStyle(color: theme.textPrimary, fontSize: 14),
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock, color: theme.textMuted, size: 20),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    onPressed: _wifiConnecting ? null : _connectWiFi,
-                    icon: _wifiConnecting
-                        ? SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.wifi, size: 18),
-                    label: Text(
-                      _wifiConnecting ? 'Connecting...' : 'Connect',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_wifiStatus != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _wifiStatus!,
-                    style: TextStyle(
-                      color: _wifiStatus == 'Connected'
-                          ? theme.success
-                          : theme.error,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+          SizedBox(height: 10),
+          GlassContainer(
+            padding: EdgeInsets.all(16),
+            child: Column(children: [
+              TextField(
+                controller: _ssidController,
+                style: TextStyle(color: theme.textPrimary, fontSize: 14),
+                decoration: InputDecoration(labelText: 'Device IP', prefixIcon: Icon(Icons.wifi, color: theme.textMuted, size: 20)),
+              ),
+              SizedBox(height: 12),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                style: TextStyle(color: theme.textPrimary, fontSize: 14),
+                decoration: InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock, color: theme.textMuted, size: 20)),
+              ),
+              SizedBox(height: 16),
+              GlassButton(
+                width: double.infinity,
+                onTap: _wifiConnecting ? null : _connectWiFi,
+                child: _wifiConnecting
+                  ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text('CONNECT', style: TextStyle(color: theme.primary, fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 1.5)),
+              ),
+              if (_wifiStatus != null) ...[
+                SizedBox(height: 8),
+                Text(_wifiStatus!, style: TextStyle(color: _wifiStatus == 'Connected' ? theme.success : theme.error, fontSize: 12)),
               ],
-            ),
+            ]),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           _sectionLabel(theme, 'DEVICE INFO'),
-          const SizedBox(height: 8),
-          Consumer<DeviceService>(
-            builder: (_, svc, _) {
-              final d = svc.data;
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.card,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: theme.cardBorder),
-                ),
-                child: Column(
-                  children: [
-                    _infoRow(theme, 'Uptime', _formatUptime(d.uptime)),
-                    _infoDivider(theme),
-                    _infoRow(theme, 'Free Heap', '${(d.heap / 1024).floor()} KB'),
-                    _infoDivider(theme),
-                    _infoRow(theme, 'RSSI', '${d.rssi} dBm'),
-                    _infoDivider(theme),
-                    _infoRow(theme, 'IP Address', d.ip),
-                    _infoDivider(theme),
-                    _infoRow(theme, 'SSID', d.ssid),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          _sectionLabel(theme, 'ACTIONS'),
-          const SizedBox(height: 8),
-          SizedBox(
+          SizedBox(height: 10),
+          Consumer<DeviceService>(builder: (_, svc, _) {
+            final d = svc.data;
+            return GlassContainer(
+              padding: EdgeInsets.all(16),
+              child: Column(children: [
+                _infoRow(theme, 'Uptime', _formatUptime(d.uptime)),
+                _divider(theme),
+                _infoRow(theme, 'Free Heap', '${(d.heap / 1024).floor()} KB'),
+                _divider(theme),
+                _infoRow(theme, 'RSSI', '${d.rssi} dBm'),
+                _divider(theme),
+                _infoRow(theme, 'IP Address', d.ip),
+                _divider(theme),
+                _infoRow(theme, 'SSID', d.ssid),
+              ]),
+            );
+          }),
+          SizedBox(height: 24),
+          GlassButton(
             width: double.infinity,
             height: 52,
-            child: ElevatedButton(
-              onPressed: _sending ? null : _apply,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: _sending
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      'Apply Settings',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+            onTap: _sending ? null : _apply,
+            child: _sending
+              ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: theme.primary))
+              : Text('APPLY SETTINGS', style: TextStyle(color: theme.primary, fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 2)),
+          ),
+          SizedBox(height: 16),
+          GestureDetector(
+            onTap: _reboot,
+            child: GlassContainer(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: 16),
+              borderColor: theme.error.withAlpha(40),
+              bgColor: theme.error.withAlpha(8),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.restart_alt, color: theme.error, size: 20),
+                SizedBox(width: 8),
+                Text('REBOOT DEVICE', style: TextStyle(color: theme.error, fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 1.5)),
+              ]),
             ),
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: _reboot,
-              icon: const Icon(Icons.restart_alt, size: 20),
-              label: const Text(
-                'Reboot Device',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.error.withAlpha(30),
-                foregroundColor: theme.error,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: theme.error.withAlpha(80)),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
         ],
-      ),
-    );
-  }
-
-  Widget _sectionLabel(AppTheme theme, String label) {
-    return Text(
-      label,
-      style: TextStyle(
-        color: theme.textMuted,
-        fontSize: 10,
-        letterSpacing: 2,
-        fontWeight: FontWeight.w600,
       ),
     );
   }
 
   Widget _infoRow(AppTheme theme, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(color: theme.textSecondary, fontSize: 13),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: theme.primary,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'monospace',
-            ),
-          ),
-        ],
-      ),
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text(label, style: TextStyle(color: theme.textSecondary, fontSize: 13, letterSpacing: 0.3)),
+        Text(value, style: TextStyle(color: theme.primary, fontSize: 13, fontWeight: FontWeight.w500, fontFamily: 'monospace')),
+      ]),
     );
   }
 
-  Widget _infoDivider(AppTheme theme) {
-    return Divider(color: theme.cardBorder, height: 1);
-  }
+  Widget _divider(AppTheme theme) => Divider(color: theme.cardBorder, height: 1);
 
-  IconData _timeoutIcon(int i) {
-    switch (i) {
-      case 0: return Icons.timer_outlined;
-      case 1: return Icons.timer_outlined;
-      case 2: return Icons.timer;
-      case 3: return Icons.timer;
-      case 4: return Icons.timer_sharp;
-      default: return Icons.timer;
-    }
+  Widget _sectionLabel(AppTheme theme, String label) {
+    return Text(label, style: TextStyle(color: theme.textMuted, fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.w600));
   }
 
   String _formatUptime(int seconds) {

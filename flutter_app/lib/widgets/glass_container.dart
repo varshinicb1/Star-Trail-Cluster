@@ -33,7 +33,7 @@ class GlassContainer extends StatelessWidget {
     final theme = Theme.of(context);
     final color = borderColor ?? theme.colorScheme.primary.withAlpha(30);
     final bg = bgColor ?? theme.colorScheme.surface.withAlpha(180);
-    final radius = borderRadius ?? BorderRadius.circular(16);
+    final bRadius = borderRadius ?? BorderRadius.circular(16);
     return Container(
       width: width,
       height: height,
@@ -42,7 +42,7 @@ class GlassContainer extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: gradient,
         color: gradient == null ? bg : null,
-        borderRadius: radius,
+        borderRadius: bRadius,
         border: Border.all(color: color, width: 0.5),
         boxShadow: boxShadow ?? [
           BoxShadow(
@@ -56,7 +56,7 @@ class GlassContainer extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: borderRadius ?? BorderRadius.circular(16),
+          borderRadius: bRadius is BorderRadius ? bRadius : BorderRadius.circular(16),
           splashColor: theme.colorScheme.primary.withAlpha(20),
           highlightColor: Colors.transparent,
           child: Padding(
@@ -74,6 +74,7 @@ class GlassButton extends StatelessWidget {
   final VoidCallback? onTap;
   final double? width, height;
   final Color? accentColor;
+  final Color? bgColor;
 
   const GlassButton({
     super.key,
@@ -82,6 +83,7 @@ class GlassButton extends StatelessWidget {
     this.width,
     this.height,
     this.accentColor,
+    this.bgColor,
   });
 
   @override
@@ -93,7 +95,7 @@ class GlassButton extends StatelessWidget {
       height: height,
       padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       borderColor: color.withAlpha(50),
-      bgColor: theme.colorScheme.surface.withAlpha(200),
+      bgColor: bgColor ?? theme.colorScheme.surface.withAlpha(200),
       onTap: onTap,
       child: child,
     );
@@ -107,7 +109,7 @@ class GlowingDot extends StatefulWidget {
 
   const GlowingDot({
     super.key,
-    this.color = Color(0xFF00FF88),
+    this.color = const Color(0xFF00FF88),
     this.size = 8,
     this.animate = true,
   });
@@ -158,7 +160,7 @@ class _GlowingDotState extends State<GlowingDot> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _animation,
-      builder: (_, __) => Container(
+      builder: (_, _) => Container(
         width: widget.size,
         height: widget.size,
         decoration: BoxDecoration(

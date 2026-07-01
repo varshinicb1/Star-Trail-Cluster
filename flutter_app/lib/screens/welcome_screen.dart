@@ -273,7 +273,7 @@ class _StarfieldState extends State<_Starfield> with SingleTickerProviderStateMi
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
-      builder: (_, __) => CustomPaint(
+      builder: (context, _) => CustomPaint(
         size: Size.infinite,
         painter: _StarfieldPainter(_controller.value, widget.theme),
       ),

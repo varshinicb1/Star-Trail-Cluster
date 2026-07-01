@@ -180,7 +180,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
               return GestureDetector(
                 onTap: () async {
                   var ok = await svc.connectBLE(d['id']!);
-                  if (ok && context.mounted) {
+                  if (ok && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connected to ${d['name']}'), backgroundColor: theme.success));
                   }
                 },

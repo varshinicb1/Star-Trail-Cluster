@@ -21,6 +21,7 @@ class DeviceService extends ChangeNotifier {
 
   // WiFi
   String? _wifiHost;
+  String? get wifiHost => _wifiHost;
   Timer? _pollTimer;
 
   // Simulator
@@ -150,7 +151,7 @@ class DeviceService extends ChangeNotifier {
     _data = DeviceData.fromJson(json);
   }
 
-  static String _routeCommand(String command) {
+  static String routeCommand(String command) {
     var eq = command.indexOf('=');
     var key = eq > 0 ? command.substring(0, eq) : command;
     var val = eq > 0 ? command.substring(eq + 1) : '';
@@ -175,10 +176,30 @@ class DeviceService extends ChangeNotifier {
     }
   }
 
+  Future<bool> uploadFirmware(List<int> firmwareBytes, {void Function(double)? onProgress}) async {
+    if (mode != ConnectionMode.wifi || _wifiHost == null) return false;
+    try {
+      var uri = Uri.parse('http://$_wifiHost/update');
+      var request = http.MultipartRequest('POST', uri);
+      request.files.add(http.MultipartFile.fromBytes(
+        'update',
+        firmwareBytes,
+        filename: 'firmware.bin',
+      ));
+      var streamed = await request.send();
+      var resp = await http.Response.fromStream(streamed);
+      return resp.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static String testRoute(String command) => routeCommand(command);
+
   Future<bool> sendCommand(String command) async {
     if (mode == ConnectionMode.wifi && _wifiHost != null) {
       try {
-        var path = _routeCommand(command);
+        var path = routeCommand(command);
         var resp = await http
             .get(Uri.parse('http://$_wifiHost$path'))
             .timeout(Duration(seconds: 3));

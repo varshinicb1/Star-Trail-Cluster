@@ -41,12 +41,12 @@ class DeviceData {
 
   factory DeviceData.fromJson(Map<String, dynamic> json) {
     return DeviceData(
-      heading: (json['heading'] ?? 0).toDouble(),
-      pitch: (json['pitch'] ?? 0).toDouble(),
-      roll: (json['roll'] ?? 0).toDouble(),
-      temperature: (json['temp'] ?? 25).toDouble(),
-      altitude: (json['alt_ft'] ?? 920).toDouble(),
-      pressure: (json['pressure'] ?? 1013).toDouble(),
+      heading: (json['heading'] ?? json['h'] ?? 0).toDouble(),
+      pitch: (json['pitch'] ?? json['p'] ?? 0).toDouble(),
+      roll: (json['roll'] ?? json['r'] ?? 0).toDouble(),
+      temperature: (json['temp'] ?? json['t'] ?? 25).toDouble(),
+      altitude: (json['alt_ft'] ?? json['a'] ?? 920).toDouble(),
+      pressure: (json['pressure'] ?? json['pr'] ?? 1013).toDouble(),
       magRawX: (json['mx'] ?? 0).toInt(),
       magRawY: (json['my'] ?? 0).toInt(),
       magRawZ: (json['mz'] ?? 0).toInt(),
@@ -56,6 +56,9 @@ class DeviceData {
       time: json['time'] ?? '--:--:--',
       uptime: (json['uptime'] ?? 0).toInt(),
       heap: (json['heap'] ?? 0).toInt(),
+      accelX: (json['ax'] ?? 0).toDouble(),
+      accelY: (json['ay'] ?? 0).toDouble(),
+      accelZ: (json['az'] ?? 0).toDouble(),
     );
   }
 

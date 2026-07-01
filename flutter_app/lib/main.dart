@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/device_service.dart';
+import 'services/update_service.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/config_screen.dart';
 import 'screens/ota_screen.dart';
 import 'screens/device_controls_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +27,7 @@ class StarTrailApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => DeviceService()),
+        ChangeNotifierProvider(create: (_) => UpdateService()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (_, tp, _) => MaterialApp(

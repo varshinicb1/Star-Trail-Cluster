@@ -222,7 +222,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _connectionPill(AppTheme theme, DeviceService svc) {
     final sim = svc.mode == ConnectionMode.simulator;
-    final connected = svc.mode == ConnectionMode.ble || svc.mode == ConnectionMode.wifi;
     final color = sim ? theme.warning : theme.success;
     final text = sim ? 'Simulator Mode' : 'Connected';
     final sub = sim ? 'Local simulation' : '${svc.data.ssid} • ${svc.data.ip}';
