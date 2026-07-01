@@ -347,10 +347,18 @@ void loop() {
     static uint32_t lastBleNotify = 0;
     if (millis() - lastBleNotify > 500) {
       lastBleNotify = millis();
-      char json[256];
+      float ax, ay, az;
+      sensors_get_accel(&ax, &ay, &az);
+      int16_t mx, my, mz;
+      sensors_get_mag_raw(&mx, &my, &mz);
+      char json[384];
       snprintf(json, sizeof(json),
-               "{\"h\":%.1f,\"p\":%.1f,\"r\":%.1f,\"t\":%.1f,\"a\":%.1f,\"pr\":%.1f}",
-               (float)gH, (float)gP, (float)gR, (float)gT, (float)gA, (float)gPr);
+               "{\"heading\":%.1f,\"pitch\":%.1f,\"roll\":%.1f,\"temp\":%.1f,"
+               "\"alt_ft\":%.1f,\"pressure\":%.1f,\"mx\":%d,\"my\":%d,\"mz\":%d,"
+               "\"ax\":%.3f,\"ay\":%.3f,\"az\":%.3f}",
+               (float)gH, (float)gP, (float)gR, (float)gT,
+               (float)gA * 3.28084f, (float)gPr,
+               mx, my, mz, ax, ay, az);
       ble_data_notify(json);
     }
   }

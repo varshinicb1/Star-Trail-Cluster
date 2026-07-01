@@ -17,6 +17,7 @@ class DeviceService extends ChangeNotifier {
   // BLE
   BluetoothDevice? _bleDevice;
   BluetoothCharacteristic? _dataChar;
+  BluetoothCharacteristic? _cmdChar;
 
   // WiFi
   String? _wifiHost;
@@ -50,7 +51,7 @@ class DeviceService extends ChangeNotifier {
       var services = await _bleDevice!.discoverServices();
       for (var svc in services) {
         for (var chr in svc.characteristics) {
-          if (chr.properties.notify) {
+          if (chr.properties.notify && _dataChar == null) {
             _dataChar = chr;
             await chr.setNotifyValue(true);
             chr.onValueReceived.listen((val) {
@@ -58,11 +59,16 @@ class DeviceService extends ChangeNotifier {
               var parsed = jsonDecode(json);
               _updateFromJson(parsed);
             });
-            mode = ConnectionMode.ble;
-            notifyListeners();
-            return true;
+          }
+          if (chr.properties.write || chr.properties.writeWithoutResponse) {
+            _cmdChar = chr;
           }
         }
+      }
+      if (_dataChar != null) {
+        mode = ConnectionMode.ble;
+        notifyListeners();
+        return true;
       }
       return false;
     } catch (_) {
@@ -144,20 +150,46 @@ class DeviceService extends ChangeNotifier {
     _data = DeviceData.fromJson(json);
   }
 
+  static String _routeCommand(String command) {
+    var eq = command.indexOf('=');
+    var key = eq > 0 ? command.substring(0, eq) : command;
+    var val = eq > 0 ? command.substring(eq + 1) : '';
+    switch (key) {
+      case 'reboot':       return '/reboot';
+      case 'brightness':   return '/api/brightness?v=$val';
+      case 'timeout':      return '/api/timeout?v=$val';
+      case 'led_on':       return '/api/led?state=on';
+      case 'led_off':      return '/api/led?state=off';
+      case 'led_color':    return '/api/led?color=${val.replaceFirst("#", "")}';
+      case 'led_brightness': return '/api/led?brightness=$val';
+      case 'led_pattern':  return '/api/led?pattern=$val';
+      case 'led_speed':    return '/api/led?speed=$val';
+      case 'widgets':      return '/api/widgets?enabled=$val';
+      case 'widget_order': return '/api/widgets?order=$val';
+      case 'swipe_dir':    return '/api/widgets?swipe=$val';
+      case 'knob_mode':    return '/api/widgets?knob=$val';
+      case 'play':         return '/api/music?cmd=play';
+      case 'next':         return '/api/music?cmd=next';
+      case 'prev':         return '/api/music?cmd=prev';
+      default:             return '/$command';
+    }
+  }
+
   Future<bool> sendCommand(String command) async {
     if (mode == ConnectionMode.wifi && _wifiHost != null) {
       try {
+        var path = _routeCommand(command);
         var resp = await http
-            .get(Uri.parse('http://$_wifiHost/$command'))
+            .get(Uri.parse('http://$_wifiHost$path'))
             .timeout(Duration(seconds: 3));
         return resp.statusCode == 200;
       } catch (_) {
         return false;
       }
     }
-    if (mode == ConnectionMode.ble && _dataChar != null) {
+    if (mode == ConnectionMode.ble && _cmdChar != null) {
       try {
-        await _dataChar!.write(utf8.encode(command));
+        await _cmdChar!.write(utf8.encode(command));
         return true;
       } catch (_) {
         return false;

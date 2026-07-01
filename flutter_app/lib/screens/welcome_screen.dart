@@ -1,8 +1,10 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/logo_widgets.dart';
+import '../widgets/glass_container.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -10,62 +12,41 @@ class WelcomeScreen extends StatefulWidget {
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen>
-    with TickerProviderStateMixin {
-  late final AnimationController _entranceController;
-  late final AnimationController _pulseController;
-  late final Animation<double> _fadeIn;
-  late final Animation<double> _logoScale;
-  late final Animation<Offset> _slideUp;
-  late final Animation<double> _pulse;
+class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late AnimationController _pulseController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
+  bool _entered = false;
 
   @override
   void initState() {
     super.initState();
-    _entranceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..forward();
-
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
-
-    _fadeIn = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0, 0.5, curve: Curves.easeOut),
-      ),
+    _fadeController = AnimationController(vsync: this, duration: Duration(milliseconds: 1200));
+    _pulseController = AnimationController(vsync: this, duration: Duration(seconds: 3));
+    _slideController = AnimationController(vsync: this, duration: Duration(milliseconds: 800));
+    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(begin: Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
     );
-
-    _logoScale = Tween<double>(begin: 0.3, end: 1).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0, 0.6, curve: Curves.easeOutBack),
-      ),
-    );
-
-    _slideUp = Tween<Offset>(
-      begin: const Offset(0, 0.4),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.2, 0.6, curve: Curves.easeOutCubic),
-      ),
-    );
-
-    _pulse = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOutSine),
-    );
+    _fadeController.forward();
+    _slideController.forward();
+    _pulseController.repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _entranceController.dispose();
+    _fadeController.dispose();
     _pulseController.dispose();
+    _slideController.dispose();
     super.dispose();
+  }
+
+  void _enter() {
+    if (_entered) return;
+    _entered = true;
+    Navigator.pushReplacementNamed(context, '/home');
   }
 
   @override
@@ -77,234 +58,250 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [theme.gradientStart, theme.gradientEnd],
+            colors: [
+              theme.surface,
+              theme.surfaceLight,
+              theme.card,
+            ],
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              const Spacer(flex: 2),
-              AnimatedBuilder(
-                animation: _logoScale,
-                builder: (_, child) => Transform.scale(
-                  scale: _logoScale.value,
-                  child: child,
-                ),
-                child: AnimatedBuilder(
-                  animation: _pulse,
-                  builder: (_, child) => Transform.scale(
-                    scale: _pulse.value,
-                    child: child,
-                  ),
-                  child: const ThemeLogo(size: 120, animate: true),
-                ),
-              ),
-              const SizedBox(height: 28),
-              FadeTransition(
-                opacity: _fadeIn,
+        child: Stack(
+          children: [
+            _Starfield(theme: theme),
+            SafeArea(
+              child: FadeTransition(
+                opacity: _fadeAnim,
                 child: SlideTransition(
-                  position: _slideUp,
+                  position: _slideAnim,
                   child: Column(
                     children: [
+                      Spacer(flex: 2),
+                      // Logo
+                      AnimatedBuilder(
+                        animation: _pulseController,
+                        builder: (_, child) => Transform.scale(
+                          scale: 0.92 + _pulseController.value * 0.08,
+                          child: child,
+                        ),
+                        child: Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.glow?.withAlpha(25) ?? Colors.transparent,
+                                blurRadius: 40,
+                                spreadRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: ThemeLogo(size: 120),
+                        ),
+                      ),
+                      SizedBox(height: 28),
                       Text(
-                        'Welcome',
+                        'STAR TRAIL',
                         style: TextStyle(
-                          color: Colors.white.withAlpha(200),
-                          fontSize: 26,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w200,
+                          color: theme.textPrimary,
+                          letterSpacing: 12,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        theme.welcomeSubtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.textMuted,
+                          letterSpacing: 4,
                           fontWeight: FontWeight.w300,
-                          letterSpacing: 6,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'DR',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 54,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2,
-                          height: 1.1,
+                      SizedBox(height: 8),
+                      Container(
+                        width: 40,
+                        height: 1,
+                        color: theme.primary.withAlpha(80),
+                      ),
+                      Spacer(flex: 1),
+                      // Theme selector
+                      _ThemeSelector(theme: theme),
+                      SizedBox(height: 40),
+                      // Enter button
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 48),
+                        child: GlassButton(
+                          width: double.infinity,
+                          height: 56,
+                          accentColor: theme.primary,
+                          onTap: _enter,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [theme.primary.withAlpha(40), theme.primary.withAlpha(15)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'ENTER',
+                                  style: TextStyle(
+                                    color: theme.primary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 4,
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Icon(Icons.arrow_forward, color: theme.primary, size: 18),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
+                      Spacer(flex: 2),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
-              FadeTransition(
-                opacity: _fadeIn,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemeSelector extends StatelessWidget {
+  final AppTheme theme;
+  const _ThemeSelector({required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    final tp = context.watch<ThemeProvider>();
+    return GlassContainer(
+      padding: EdgeInsets.all(6),
+      margin: EdgeInsets.symmetric(horizontal: 40),
+      borderRadius: BorderRadius.circular(30),
+      borderColor: theme.cardBorder,
+      bgColor: theme.card.withAlpha(180),
+      child: Row(
+        children: List.generate(AppThemeMode.values.length, (i) {
+          final mode = AppThemeMode.values[i];
+          final t = AppTheme.fromMode(mode);
+          final active = tp.mode == mode;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => tp.setTheme(mode),
+              child: AnimatedContainer(
+                duration: Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: active ? t.primary.withAlpha(25) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: active ? t.primary.withAlpha(60) : Colors.transparent,
+                    width: 1,
+                  ),
+                ),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      theme.name,
-                      style: TextStyle(
-                        color: theme.primary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1,
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [t.primary, t.accent],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
-                      theme.welcomeSubtitle,
+                      t.name,
                       style: TextStyle(
-                        color: Colors.white.withAlpha(140),
-                        fontSize: 12,
-                        letterSpacing: 1,
+                        fontSize: 10,
+                        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                        color: active ? t.primary : theme.textMuted,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Spacer(flex: 2),
-              Consumer<ThemeProvider>(
-                builder: (_, tp, _) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: AppThemeMode.values.map((mode) {
-                      final t = AppTheme.fromMode(mode);
-                      final selected = tp.mode == mode;
-                      return Expanded(
-                        child: GestureDetector(
-                          onTap: () => tp.setTheme(mode),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 350),
-                            curve: Curves.easeOut,
-                            margin: const EdgeInsets.symmetric(horizontal: 5),
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 14,
-                              horizontal: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? Colors.white.withAlpha(15)
-                                  : Colors.white.withAlpha(4),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: selected
-                                    ? t.primary
-                                    : Colors.white.withAlpha(20),
-                                width: selected ? 2 : 1,
-                              ),
-                              boxShadow: selected
-                                  ? [
-                                      BoxShadow(
-                                        color: t.primary.withAlpha(40),
-                                        blurRadius: 12,
-                                        spreadRadius: 0,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox(
-                                  width: 40,
-                                  height: 40,
-                                  child: CustomPaint(
-                                    size: const Size(40, 40),
-                                    painter: _logoPainter(mode, t.primary),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: t.primary,
-                                    boxShadow: selected
-                                        ? [
-                                            BoxShadow(
-                                              color: t.primary.withAlpha(160),
-                                              blurRadius: 8,
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _themeLabel(mode),
-                                  style: TextStyle(
-                                    color: selected
-                                        ? t.primary
-                                        : Colors.white.withAlpha(140),
-                                    fontSize: 10,
-                                    fontWeight: selected
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 28),
-              Consumer<ThemeProvider>(
-                builder: (_, tp, _) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: () =>
-                          Navigator.pushReplacementNamed(context, '/home'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: tp.theme.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shadowColor: tp.theme.glow?.withAlpha(80),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text(
-                        'Get Started',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
+            ),
+          );
+        }),
       ),
     );
   }
+}
 
-  String _themeLabel(AppThemeMode mode) {
-    switch (mode) {
-      case AppThemeMode.starTrail:
-        return 'Star Trail';
-      case AppThemeMode.illuminati:
-        return 'Illuminati';
-      case AppThemeMode.neutral:
-        return 'DR';
-    }
+class _Starfield extends StatefulWidget {
+  final AppTheme theme;
+  const _Starfield({required this.theme});
+
+  @override
+  State<_Starfield> createState() => _StarfieldState();
+}
+
+class _StarfieldState extends State<_Starfield> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: Duration(seconds: 20));
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) => CustomPaint(
+        size: Size.infinite,
+        painter: _StarfieldPainter(_controller.value, widget.theme),
+      ),
+    );
   }
 }
 
-CustomPainter _logoPainter(AppThemeMode mode, Color color) {
-  switch (mode) {
-    case AppThemeMode.starTrail:
-      return StarTrailLogoPainter(color: color, glowColor: color);
-    case AppThemeMode.illuminati:
-      return IlluminatiLogoPainter(color: color, glowColor: color);
-    case AppThemeMode.neutral:
-      return DRLettersPainter(color: color, glowColor: color);
+class _StarfieldPainter extends CustomPainter {
+  final double phase;
+  final AppTheme theme;
+  _StarfieldPainter(this.phase, this.theme);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng = math.Random(42);
+    for (int i = 0; i < 60; i++) {
+      final x = rng.nextDouble() * size.width;
+      final y = rng.nextDouble() * size.height;
+      final r = rng.nextDouble() * 1.5 + 0.3;
+      final alpha = ((math.sin(phase * math.pi * 2 + i * 1.7) + 1) / 2 * 0.5 + 0.2) * 255;
+      canvas.drawCircle(
+        Offset(x, y),
+        r,
+        Paint()..color = theme.textMuted.withAlpha(alpha.toInt()),
+      );
+    }
   }
+
+  @override
+  bool shouldRepaint(_StarfieldPainter o) => o.phase != phase;
 }
