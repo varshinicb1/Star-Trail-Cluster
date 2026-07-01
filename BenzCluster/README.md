@@ -27,6 +27,17 @@ ESP32-S3 automotive instrument cluster firmware with LVGL display.
 | **System Info** | CPU, memory, uptime, WiFi status |
 | **Calibration** | Magnetometer figure-8 calibration wizard |
 | **LED Color** | NeoPixel color picker |
+| **Custom** | User-designed face pushed from the companion app (see below) |
+
+### Custom Widgets (designer pipeline)
+Design your own cluster face in the companion app's **Designer** tab — drag
+gauges, value readouts, text, bars, icons, and shapes onto a 240×240 canvas,
+bind elements to live sensors (heading, pitch, roll, temp, altitude, pressure),
+then push to the device. The layout is a small JSON document (shared contract in
+`custom_widget.h`) rendered on-device by a generic LVGL interpreter — no
+per-design firmware. Transport: **BLE primary** (chunked writes on the custom
+layout characteristic), **WiFi fallback** (`POST /api/custom_layout`). The active
+layout is stored on SPIFFS (`/custom/layout.json`) and survives reboot.
 
 ### Splash Screens
 Configurable in `/splash_theme.txt` on SPIFFS:
@@ -46,6 +57,8 @@ Access at `http://<device-ip>/` (printed on serial at boot)
 | Music | Remote play/pause/next/prev + volume |
 | Update | OTA firmware upload (.bin) |
 | System | Uptime, heap, brightness control, reboot |
+
+Custom layout push endpoint: `POST /api/custom_layout` (raw JSON body).
 
 ### OTA Updates
 1. Open `http://<device-ip>/` in browser
@@ -75,6 +88,8 @@ BenzCluster/
 ├── systemview.cpp/h      # System info widget
 ├── calibration.cpp/h     # Magnetometer calibration logic
 ├── calibration_widget.cpp/h  # Calibration UI
+├── custom_widget.cpp/h   # Dynamic LVGL renderer + JSON layout parser (shared)
+├── custom_screen.cpp/h   # 'Custom' widget screen hosting a pushed layout
 ├── ledcolor.cpp/h        # NeoPixel color widget
 ├── leds.cpp/h            # LED strip driver
 ├── splash.cpp/h          # Splash screen (3 themes)

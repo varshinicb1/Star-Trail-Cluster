@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 class ThemeProvider extends ChangeNotifier {
-  AppThemeMode _mode = AppThemeMode.starTrail;
+  AppThemeMode _mode = AppThemeMode.benz;
 
   AppThemeMode get mode => _mode;
   AppTheme get theme => AppTheme.fromMode(_mode);

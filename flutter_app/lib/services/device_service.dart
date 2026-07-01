@@ -5,8 +5,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:http/http.dart' as http;
 import '../models/device_data.dart';
+import '../models/widget_layout.dart';
 
 enum ConnectionMode { none, ble, wifi, simulator }
+
+/// Result of a layout push, so the UI can report which transport was used.
+enum PushResult { ok, okViaWifi, failed, notConnected }
+
+// Custom-layout GATT (must match BenzCluster/ble_notify.cpp).
+const String kLayoutServiceUuid = '00002222-3333-4444-5555-666677778888';
+const String kLayoutCharUuid = '00002222-3333-4444-5555-666677778889';
 
 class DeviceService extends ChangeNotifier {
   DeviceData _data = DeviceData();
@@ -17,6 +25,7 @@ class DeviceService extends ChangeNotifier {
   // BLE
   BluetoothDevice? _bleDevice;
   BluetoothCharacteristic? _dataChar;
+  BluetoothCharacteristic? _layoutChar;
   BluetoothCharacteristic? _cmdChar;
 
   // WiFi
@@ -52,6 +61,10 @@ class DeviceService extends ChangeNotifier {
       var services = await _bleDevice!.discoverServices();
       for (var svc in services) {
         for (var chr in svc.characteristics) {
+          // Layout push characteristic (write) — capture by its specific UUID.
+          if (chr.uuid.toString().toLowerCase() == kLayoutCharUuid) {
+            _layoutChar = chr;
+          }
           if (chr.properties.notify && _dataChar == null) {
             _dataChar = chr;
             await chr.setNotifyValue(true);
@@ -149,6 +162,50 @@ class DeviceService extends ChangeNotifier {
   // --- Common ---
   void _updateFromJson(Map<String, dynamic> json) {
     _data = DeviceData.fromJson(json);
+  }
+
+  /// Push a designed layout to the device. Tries BLE first (chunked writes
+  /// with 'B'/'C'/'F' opcodes matching the firmware), falling back to the
+  /// WiFi HTTP route if BLE is unavailable or the transfer fails.
+  Future<PushResult> pushLayout(CwLayout layout) async {
+    final json = layout.toJsonString();
+
+    // 1) BLE primary
+    if (_layoutChar != null) {
+      try {
+        const opBegin = 0x42; // 'B'
+        const opChunk = 0x43; // 'C'
+        const opFinish = 0x46; // 'F'
+        final bytes = utf8.encode(json);
+        const chunkSize = 160; // conservative; opcode byte + payload < MTU
+
+        await _layoutChar!.write([opBegin], withoutResponse: false);
+        for (var i = 0; i < bytes.length; i += chunkSize) {
+          final end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
+          await _layoutChar!.write([opChunk, ...bytes.sublist(i, end)], withoutResponse: false);
+        }
+        await _layoutChar!.write([opFinish], withoutResponse: false);
+        return PushResult.ok;
+      } catch (_) {
+        // fall through to WiFi
+      }
+    }
+
+    // 2) WiFi fallback
+    if (_wifiHost != null) {
+      try {
+        final resp = await http
+            .post(Uri.parse('http://$_wifiHost/api/custom_layout'),
+                headers: {'Content-Type': 'application/json'}, body: json)
+            .timeout(const Duration(seconds: 5));
+        if (resp.statusCode == 200) return PushResult.okViaWifi;
+        return PushResult.failed;
+      } catch (_) {
+        return PushResult.failed;
+      }
+    }
+
+    return _layoutChar == null && _wifiHost == null ? PushResult.notConnected : PushResult.failed;
   }
 
   static String routeCommand(String command) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-enum AppThemeMode { starTrail, illuminati, neutral }
+enum AppThemeMode { benz, starTrail, illuminati }
 
 class AppTheme {
   final String name;
@@ -45,6 +46,26 @@ class AppTheme {
     required this.brightness,
   });
 
+  /// Brushed-chrome gradient used for premium accent surfaces (buttons, badges).
+  /// Runs bright highlight → accent → gunmetal low, evoking polished metal.
+  /// Uses [primary]/[secondary] so it stays bright even when the full-screen
+  /// [gradientStart]/[gradientEnd] background gradient is dark.
+  LinearGradient get chromeGradient => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color.lerp(primary, Colors.white, 0.35)!,
+      primary,
+      secondary,
+    ],
+    stops: const [0.0, 0.5, 1.0],
+  );
+
+  /// Foreground colour that reads cleanly on top of [primary] (dark text on a
+  /// light silver primary, white on a saturated one).
+  Color get onPrimary =>
+      primary.computeLuminance() > 0.5 ? const Color(0xFF0A0A0C) : Colors.white;
+
   static const _defaultTextTheme = TextTheme(
     headlineLarge: TextStyle(fontWeight: FontWeight.w300, letterSpacing: -0.5),
     headlineMedium: TextStyle(fontWeight: FontWeight.w400, letterSpacing: -0.25),
@@ -67,7 +88,12 @@ class AppTheme {
       elevation: 0,
       centerTitle: true,
       scrolledUnderElevation: 0,
-      titleTextStyle: TextStyle(color: textPrimary, fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+      titleTextStyle: GoogleFonts.inter(
+        color: textPrimary,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.5,
+      ),
       iconTheme: IconThemeData(color: textPrimary),
     ),
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
@@ -88,9 +114,13 @@ class AppTheme {
       ),
     ),
     dividerTheme: DividerThemeData(color: cardBorder, thickness: 1),
-    textTheme: _defaultTextTheme.apply(
-      bodyColor: textPrimary,
-      displayColor: textPrimary,
+    // V11's richer style set, colourised, then wrapped in Inter for the
+    // premium cluster typography.
+    textTheme: GoogleFonts.interTextTheme(
+      _defaultTextTheme.apply(
+        bodyColor: textPrimary,
+        displayColor: textPrimary,
+      ),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? primary : textMuted),
@@ -196,35 +226,36 @@ class AppTheme {
     brightness: Brightness.dark,
   );
 
-  static const neutral = AppTheme(
-    name: 'DR',
-    welcomeSubtitle: 'DR • Personal',
-    primary: Color(0xFF8866FF),
-    secondary: Color(0xFF6644CC),
-    accent: Color(0xFFAA88FF),
-    surface: Color(0xFF0A0A0F),
-    surfaceLight: Color(0xFF0F0F18),
-    card: Color(0xFF14141A),
-    cardBorder: Color(0xFF22222E),
-    textPrimary: Color(0xFFEEEEFF),
-    textSecondary: Color(0xFF9999AA),
-    textMuted: Color(0xFF555566),
-    success: Color(0xFF88FF88),
-    warning: Color(0xFFFFCC00),
-    error: Color(0xFFFF5555),
-    gradientStart: Color(0xFF8866FF),
-    gradientEnd: Color(0xFF5533AA),
-    glow: Color(0xFF8866FF),
+  // Premium black / gunmetal / brushed-chrome — the flagship automotive theme.
+  static const benz = AppTheme(
+    name: 'Benz',
+    welcomeSubtitle: 'Star Trail • Premium Cluster',
+    primary: Color(0xFFC8C9CC),       // brushed chrome / steel silver
+    secondary: Color(0xFF8E9195),     // gunmetal
+    accent: Color(0xFF6FA8C7),        // cool steel-blue highlight
+    surface: Color(0xFF0A0A0C),       // near-black cockpit
+    surfaceLight: Color(0xFF121216),  // raised panel
+    card: Color(0xFF17171B),          // gunmetal card
+    cardBorder: Color(0xFF2A2A30),    // subtle metal edge
+    textPrimary: Color(0xFFF2F3F5),   // polished white
+    textSecondary: Color(0xFFA9ABB0), // silver text
+    textMuted: Color(0xFF6A6C72),     // muted steel
+    success: Color(0xFF7FD1A6),       // restrained mint
+    warning: Color(0xFFE0B15A),       // amber
+    error: Color(0xFFD46A6A),         // muted red
+    gradientStart: Color(0xFF1D1D22), // dark metallic (full-screen bg top)
+    gradientEnd: Color(0xFF050506),   // near-black (full-screen bg bottom)
+    glow: Color(0xFF8FB4CC),          // faint steel-blue glow
     brightness: Brightness.dark,
   );
 
-  static const themes = [starTrail, illuminati, neutral];
+  static const themes = [benz, starTrail, illuminati];
 
   static AppTheme fromMode(AppThemeMode mode) {
     switch (mode) {
+      case AppThemeMode.benz: return benz;
       case AppThemeMode.starTrail: return starTrail;
       case AppThemeMode.illuminati: return illuminati;
-      case AppThemeMode.neutral: return neutral;
     }
   }
 }

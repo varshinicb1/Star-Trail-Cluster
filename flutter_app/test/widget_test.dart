@@ -16,6 +16,6 @@ void main() {
 
     expect(find.text('Star Trail'), findsWidgets);
     expect(find.text('Illuminati'), findsWidgets);
-    expect(find.text('DR'), findsWidgets);
+    expect(find.text('Benz'), findsWidgets);
   });
 }
