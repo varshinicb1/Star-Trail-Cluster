@@ -29,14 +29,70 @@ static SDL_Texture *texture = nullptr;
 static lv_color_t *buf1 = nullptr;
 #define BUF_SIZE (240 * 240)
 
+// Persistent framebuffer for headless screenshot capture (ARGB8888, as stored
+// by LVGL at 32-bit). Updated on every flush so partial redraws accumulate.
+static uint32_t g_fb[240 * 240];
+
+// When true (screenshot mode) the flush callback skips all SDL calls so the
+// simulator can render headlessly with no window/display available.
+static bool g_headless = false;
+
 static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
-  int w = area->x2 - area->x1 + 1;
-  int h = area->y2 - area->y1 + 1;
-  SDL_UpdateTexture(texture, nullptr, color_p, 240 * sizeof(lv_color_t));
-  SDL_RenderClear(renderer);
-  SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-  SDL_RenderPresent(renderer);
+  // Copy the flushed region into the persistent framebuffer.
+  lv_color_t *p = color_p;
+  for (int y = area->y1; y <= area->y2; y++) {
+    for (int x = area->x1; x <= area->x2; x++) {
+      if (x >= 0 && x < 240 && y >= 0 && y < 240)
+        g_fb[y * 240 + x] = p->full;
+      p++;
+    }
+  }
+  if (!g_headless) {
+    SDL_UpdateTexture(texture, nullptr, color_p, 240 * sizeof(lv_color_t));
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+    SDL_RenderPresent(renderer);
+  }
   lv_disp_flush_ready(disp);
+}
+
+// Write the current framebuffer to a 24-bit BMP (no external deps). The 32-bit
+// framebuffer stores ARGB8888 (0xAARRGGBB), matching SDL's ARGB8888 texture.
+static void save_bmp(const char *path) {
+  const int W = 240, H = 240;
+  const int rowSize = (W * 3 + 3) & ~3;  // padded to 4 bytes
+  const int dataSize = rowSize * H;
+  const int fileSize = 54 + dataSize;
+  unsigned char hdr[54] = {0};
+  hdr[0] = 'B'; hdr[1] = 'M';
+  hdr[2] = fileSize; hdr[3] = fileSize >> 8; hdr[4] = fileSize >> 16; hdr[5] = fileSize >> 24;
+  hdr[10] = 54;
+  hdr[14] = 40;
+  hdr[18] = W; hdr[19] = W >> 8;
+  hdr[22] = H; hdr[23] = H >> 8;
+  hdr[26] = 1; hdr[28] = 24;
+  hdr[34] = dataSize; hdr[35] = dataSize >> 8; hdr[36] = dataSize >> 16; hdr[37] = dataSize >> 24;
+
+  FILE *f = fopen(path, "wb");
+  if (!f) { fprintf(stderr, "cannot write %s\n", path); return; }
+  fwrite(hdr, 1, 54, f);
+  unsigned char *row = (unsigned char *)malloc(rowSize);
+  for (int y = H - 1; y >= 0; y--) {  // BMP is bottom-up
+    memset(row, 0, rowSize);
+    for (int x = 0; x < W; x++) {
+      uint32_t c = g_fb[y * W + x];  // 0xAARRGGBB
+      unsigned char r = (c >> 16) & 0xFF;
+      unsigned char g = (c >> 8) & 0xFF;
+      unsigned char b = c & 0xFF;
+      row[x * 3 + 0] = b;  // BMP stores BGR
+      row[x * 3 + 1] = g;
+      row[x * 3 + 2] = r;
+    }
+    fwrite(row, 1, rowSize, f);
+  }
+  free(row);
+  fclose(f);
+  printf("saved %s\n", path);
 }
 
 static const char *widget_names[] = {
@@ -55,27 +111,71 @@ static void show_widget(int idx) {
     case 5: music_show(); break;
     case 6: airplane_show(); break;
   }
-  char title[64];
-  snprintf(title, sizeof(title), "Star Trail - %s", widget_names[idx]);
-  SDL_SetWindowTitle(window, title);
+  if (!g_headless) {
+    char title[64];
+    snprintf(title, sizeof(title), "Star Trail - %s", widget_names[idx]);
+    SDL_SetWindowTitle(window, title);
+  }
 }
 
-int main(int, char **) {
-  // Init SDL2
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
-    fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
-    return 1;
+// Render each widget with representative sample data and dump a BMP into
+// `dir`. Pumps several update+timer cycles first so smoothing/animation settle.
+static void run_screenshots(const char *dir) {
+  struct Shot { const char *name; int idx; };
+  static const Shot shots[] = {
+    {"clock", 0},   {"compass", 1}, {"attitude", 2}, {"alttemp", 3},
+    {"gforce", 4},  {"music", 5},   {"airplane", 6},
+  };
+  for (const auto &s : shots) {
+    show_widget(s.idx);
+    // Advance ~800ms of LVGL time (manual ticks) so the 250ms screen-load
+    // animation and any value smoothing fully settle before capture.
+    for (int i = 0; i < 50; i++) {
+      switch (s.idx) {
+        case 1: compass_update(45.0f); break;
+        case 2: attitude_update(10.0f, -15.0f); break;
+        case 3: alttemp_update(24.5f, 6300.0f); break;
+        case 4: gforce_update(0.30f, -0.20f, 1.0f); break;
+        case 6: airplane_update(5.0f, 10.0f, 120.0f); break;
+        case 0: clock_update(); break;
+        case 5: music_update(); break;
+      }
+      lv_tick_inc(16);
+      lv_timer_handler();
+    }
+    // Force a full redraw so the whole framebuffer is current, then capture.
+    lv_obj_invalidate(lv_scr_act());
+    for (int i = 0; i < 4; i++) { lv_tick_inc(16); lv_timer_handler(); }
+    char path[512];
+    snprintf(path, sizeof(path), "%s/%s.bmp", dir, s.name);
+    save_bmp(path);
   }
+}
 
-  window = SDL_CreateWindow("Star Trail Simulator",
-    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-    240, 240, SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
+int main(int argc, char **argv) {
+  // Screenshot mode renders headlessly (no window/display required).
+  g_headless = (argc >= 3 && strcmp(argv[1], "--shots") == 0);
 
-  renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-  SDL_RenderSetLogicalSize(renderer, 240, 240);
+  if (g_headless) {
+    // Timer subsystem only, so millis()/SDL_GetTicks() work without a display.
+    SDL_Init(SDL_INIT_TIMER);
+  } else {
+    // Init SDL2 (interactive mode only)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
+      fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+      return 1;
+    }
 
-  texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB565,
-    SDL_TEXTUREACCESS_STREAMING, 240, 240);
+    window = SDL_CreateWindow("Star Trail Simulator",
+      SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+      240, 240, SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
+
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    SDL_RenderSetLogicalSize(renderer, 240, 240);
+
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+      SDL_TEXTUREACCESS_STREAMING, 240, 240);
+  }
 
   // Init LVGL
   lv_init();
@@ -105,6 +205,13 @@ int main(int, char **) {
   gforce_init();
   music_init();
   airplane_init();
+
+  // Headless screenshot mode:  simulator --shots <dir>
+  if (g_headless) {
+    run_screenshots(argv[2]);
+    free(buf1);
+    return 0;
+  }
 
   show_widget(0);
 

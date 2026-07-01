@@ -1,8 +1,12 @@
 #ifndef LV_CONF_H
 #define LV_CONF_H
 
-#define LV_COLOR_DEPTH 16
-#define LV_COLOR_16_SWAP 1
+// Render at 32-bit on the PC. The device is RGB565, but 16-bit in the sim ran
+// into LVGL byte-swap/gradient-interpolation quirks (rainbow banding). 32-bit
+// ARGB gives accurate, swap-free colours and smoother gradients while showing
+// the exact same widget layouts. SDL captures ARGB8888 directly.
+#define LV_COLOR_DEPTH 32
+#define LV_DRAW_COMPLEX 1
 #define LV_HOR_RES_MAX 240
 #define LV_VER_RES_MAX 240
 #define LV_DPI 130
@@ -64,6 +68,14 @@
 #define LV_USE_TABLE 0
 #define LV_USE_TEXTAREA 1
 #define LV_USE_KEYBOARD 0
+// Use system malloc like the firmware (LV_MEM_CUSTOM 1) so all seven full-screen
+// widget screens can be allocated at once — the fixed 64KB internal pool is far
+// too small and made lv_obj_create return NULL (crash) partway through init.
+#define LV_MEM_CUSTOM 1
+#define LV_MEM_CUSTOM_INCLUDE <stdlib.h>
+#define LV_MEM_CUSTOM_ALLOC malloc
+#define LV_MEM_CUSTOM_FREE free
+#define LV_MEM_CUSTOM_REALLOC realloc
 #define LV_MEM_SIZE (64 * 1024)
 
 #define LV_GC_ROOT_SIZE 128

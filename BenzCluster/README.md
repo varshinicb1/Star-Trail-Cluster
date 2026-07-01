@@ -4,6 +4,41 @@
 ESP32-S3 automotive instrument cluster firmware with LVGL display.  
 240×240 round LCD | MPU9250 IMU | BME280 | BLE | WiFi | OTA
 
+## Widget Preview
+Rendered from the actual firmware widget code via the LVGL PC simulator
+(`../simulator`), 240×240 round display:
+
+![Widget gallery](docs/widgets/_gallery.png)
+
+| | | | |
+|:-:|:-:|:-:|:-:|
+| ![Clock](docs/widgets/clock.png) | ![Compass](docs/widgets/compass.png) | ![Attitude](docs/widgets/attitude.png) | ![Alt/Temp](docs/widgets/alttemp.png) |
+| Clock | Compass | Attitude | Alt / Temp |
+| ![G-Force](docs/widgets/gforce.png) | ![Music](docs/widgets/music.png) | ![Airplane](docs/widgets/airplane.png) | |
+| G-Force | Music | Airplane | |
+
+### Running the simulator yourself
+The same widget code compiles and runs on a PC via SDL2 + LVGL (no hardware
+needed), so you can preview and iterate on widgets fast.
+
+**Requirements:** CMake, Ninja, a C++17 compiler (MSVC/GCC/Clang), and SDL2
+(e.g. `vcpkg install sdl2`). LVGL v8.3.9 is fetched automatically.
+
+```bash
+# Windows (MSVC + vcpkg) — helper script:
+simulator/build_sim.bat
+simulator/build/simulator.exe            # interactive: arrow keys cycle widgets
+
+# Any platform (manual):
+cmake -S simulator -B simulator/build -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake
+cmake --build simulator/build
+
+# Regenerate the preview images above (headless, no window needed):
+simulator/build/simulator --shots simulator/shots
+```
+Interactive controls: ←/→ (or ↑/↓) cycle widgets, Esc quits.
+
 ## Hardware
 | Pin | Function |
 |-----|----------|
