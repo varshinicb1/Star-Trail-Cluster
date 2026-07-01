@@ -2,11 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:star_trail/main.dart';
 
 void main() {
-  testWidgets('App renders with bottom nav', (WidgetTester tester) async {
+  testWidgets('App boots to the welcome screen', (WidgetTester tester) async {
     await tester.pumpWidget(const StarTrailApp());
-    expect(find.text('Live'), findsOneWidget);
-    expect(find.text('Emulator'), findsOneWidget);
-    expect(find.text('Config'), findsOneWidget);
-    expect(find.text('OTA'), findsOneWidget);
+    await tester.pump();
+    // The app opens on the welcome screen with the premium wordmark + CTA.
+    expect(find.text('STAR TRAIL'), findsOneWidget);
+    expect(find.text('Get Started'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
