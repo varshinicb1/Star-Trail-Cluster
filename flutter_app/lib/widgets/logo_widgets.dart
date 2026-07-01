@@ -208,17 +208,37 @@ class ThemeLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>().theme;
+    final mode = context.watch<ThemeProvider>().mode;
     final logoColor = color ?? theme.primary;
     final glow = animate ? theme.glow : null;
 
-    CustomPainter painter;
-    switch (context.watch<ThemeProvider>().mode) {
-      case AppThemeMode.benz:
-        painter = BenzStarPainter(color: logoColor, glowColor: glow);
-      case AppThemeMode.starTrail:
-        painter = StarTrailLogoPainter(color: logoColor, glowColor: glow);
-      case AppThemeMode.illuminati:
-        painter = IlluminatiLogoPainter(color: logoColor, glowColor: glow);
+    // The Benz theme uses the real chrome emblem asset; the other themes use
+    // their vector painters.
+    Widget child;
+    if (mode == AppThemeMode.benz) {
+      child = SizedBox(
+        key: const ValueKey('benz-emblem'),
+        width: size,
+        height: size,
+        child: DecoratedBox(
+          decoration: glow != null
+              ? BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: glow.withAlpha(60), blurRadius: size * 0.18)],
+                )
+              : const BoxDecoration(),
+          child: Image.asset('assets/branding/emblem.png', width: size, height: size),
+        ),
+      );
+    } else {
+      final CustomPainter painter = mode == AppThemeMode.starTrail
+          ? StarTrailLogoPainter(color: logoColor, glowColor: glow)
+          : IlluminatiLogoPainter(color: logoColor, glowColor: glow);
+      child = CustomPaint(
+        key: ValueKey(mode),
+        size: Size(size, size),
+        painter: painter,
+      );
     }
 
     return SizedBox(
@@ -226,11 +246,7 @@ class ThemeLogo extends StatelessWidget {
       height: size,
       child: AnimatedSwitcher(
         duration: animate ? const Duration(milliseconds: 400) : Duration.zero,
-        child: CustomPaint(
-          key: ValueKey(context.watch<ThemeProvider>().mode),
-          size: Size(size, size),
-          painter: painter,
-        ),
+        child: child,
       ),
     );
   }
