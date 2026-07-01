@@ -26,9 +26,11 @@ class DeviceService extends ChangeNotifier {
   BluetoothDevice? _bleDevice;
   BluetoothCharacteristic? _dataChar;
   BluetoothCharacteristic? _layoutChar;
+  BluetoothCharacteristic? _cmdChar;
 
   // WiFi
   String? _wifiHost;
+  String? get wifiHost => _wifiHost;
   Timer? _pollTimer;
 
   // Simulator
@@ -57,14 +59,13 @@ class DeviceService extends ChangeNotifier {
       _bleDevice = BluetoothDevice(remoteId: DeviceIdentifier(deviceId));
       await _bleDevice!.connect(license: License.nonprofit);
       var services = await _bleDevice!.discoverServices();
-      bool foundData = false;
       for (var svc in services) {
         for (var chr in svc.characteristics) {
-          // Layout push characteristic (write) — capture regardless of order.
+          // Layout push characteristic (write) — capture by its specific UUID.
           if (chr.uuid.toString().toLowerCase() == kLayoutCharUuid) {
             _layoutChar = chr;
           }
-          if (!foundData && chr.properties.notify) {
+          if (chr.properties.notify && _dataChar == null) {
             _dataChar = chr;
             await chr.setNotifyValue(true);
             chr.onValueReceived.listen((val) {
@@ -72,11 +73,13 @@ class DeviceService extends ChangeNotifier {
               var parsed = jsonDecode(json);
               _updateFromJson(parsed);
             });
-            foundData = true;
+          }
+          if (chr.properties.write || chr.properties.writeWithoutResponse) {
+            _cmdChar = chr;
           }
         }
       }
-      if (foundData) {
+      if (_dataChar != null) {
         mode = ConnectionMode.ble;
         notifyListeners();
         return true;
@@ -205,20 +208,66 @@ class DeviceService extends ChangeNotifier {
     return _layoutChar == null && _wifiHost == null ? PushResult.notConnected : PushResult.failed;
   }
 
+  static String routeCommand(String command) {
+    var eq = command.indexOf('=');
+    var key = eq > 0 ? command.substring(0, eq) : command;
+    var val = eq > 0 ? command.substring(eq + 1) : '';
+    switch (key) {
+      case 'reboot':       return '/reboot';
+      case 'brightness':   return '/api/brightness?v=$val';
+      case 'timeout':      return '/api/timeout?v=$val';
+      case 'led_on':       return '/api/led?state=on';
+      case 'led_off':      return '/api/led?state=off';
+      case 'led_color':    return '/api/led?color=${val.replaceFirst("#", "")}';
+      case 'led_brightness': return '/api/led?brightness=$val';
+      case 'led_pattern':  return '/api/led?pattern=$val';
+      case 'led_speed':    return '/api/led?speed=$val';
+      case 'widgets':      return '/api/widgets?enabled=$val';
+      case 'widget_order': return '/api/widgets?order=$val';
+      case 'swipe_dir':    return '/api/widgets?swipe=$val';
+      case 'knob_mode':    return '/api/widgets?knob=$val';
+      case 'play':         return '/api/music?cmd=play';
+      case 'next':         return '/api/music?cmd=next';
+      case 'prev':         return '/api/music?cmd=prev';
+      default:             return '/$command';
+    }
+  }
+
+  Future<bool> uploadFirmware(List<int> firmwareBytes, {void Function(double)? onProgress}) async {
+    if (mode != ConnectionMode.wifi || _wifiHost == null) return false;
+    try {
+      var uri = Uri.parse('http://$_wifiHost/update');
+      var request = http.MultipartRequest('POST', uri);
+      request.files.add(http.MultipartFile.fromBytes(
+        'update',
+        firmwareBytes,
+        filename: 'firmware.bin',
+      ));
+      var streamed = await request.send();
+      var resp = await http.Response.fromStream(streamed);
+      return resp.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static String testRoute(String command) => routeCommand(command);
+
   Future<bool> sendCommand(String command) async {
     if (mode == ConnectionMode.wifi && _wifiHost != null) {
       try {
+        var path = routeCommand(command);
         var resp = await http
-            .get(Uri.parse('http://$_wifiHost/$command'))
+            .get(Uri.parse('http://$_wifiHost$path'))
             .timeout(Duration(seconds: 3));
         return resp.statusCode == 200;
       } catch (_) {
         return false;
       }
     }
-    if (mode == ConnectionMode.ble && _dataChar != null) {
+    if (mode == ConnectionMode.ble && _cmdChar != null) {
       try {
-        await _dataChar!.write(utf8.encode(command));
+        await _cmdChar!.write(utf8.encode(command));
         return true;
       } catch (_) {
         return false;

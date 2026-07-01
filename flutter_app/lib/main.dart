@@ -3,16 +3,19 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/device_service.dart';
+import 'services/update_service.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/config_screen.dart';
 import 'screens/ota_screen.dart';
 import 'screens/device_controls_screen.dart';
 import 'screens/designer_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const StarTrailApp());
 }
 
@@ -25,6 +28,7 @@ class StarTrailApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => DeviceService()),
+        ChangeNotifierProvider(create: (_) => UpdateService()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (_, tp, _) => MaterialApp(
@@ -51,17 +55,29 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
   int _page = 0;
-  final PageController _pageController = PageController();
+  late PageController _pageController;
+  late AnimationController _navAnimController;
 
   final _pages = const [HomeScreen(), DesignerScreen(), DeviceControlsScreen(), OTAScreen()];
   final _labels = ['Dashboard', 'Designer', 'Controls', 'OTA'];
   final _icons = [Icons.speed, Icons.draw, Icons.tune, Icons.system_update];
 
   @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _navAnimController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 400),
+    );
+  }
+
+  @override
   void dispose() {
     _pageController.dispose();
+    _navAnimController.dispose();
     super.dispose();
   }
 
@@ -71,33 +87,118 @@ class _AppShellState extends State<AppShell> {
     return Scaffold(
       body: PageView(
         controller: _pageController,
-        onPageChanged: (i) => setState(() => _page = i),
+        onPageChanged: (i) {
+          setState(() => _page = i);
+          _navAnimController.forward(from: 0);
+        },
         children: _pages,
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: theme.cardBorder, width: 1)),
-        ),
-        child: BottomNavigationBar(
-          backgroundColor: theme.surfaceLight,
-          selectedItemColor: theme.primary,
-          unselectedItemColor: theme.textMuted,
-          type: BottomNavigationBarType.fixed,
-          currentIndex: _page,
-          onTap: (i) {
-            _pageController.animateToPage(
-              i,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            );
-            setState(() => _page = i);
-          },
-          items: List.generate(_pages.length, (i) => BottomNavigationBarItem(
-            icon: Icon(_icons[i], size: 20),
-            activeIcon: Icon(_icons[i], size: 24),
-            label: _labels[i],
-          )),
-        ),
+      bottomNavigationBar: _AnimatedNavBar(
+        theme: theme,
+        page: _page,
+        labels: _labels,
+        icons: _icons,
+        onTap: (i) {
+          _pageController.animateToPage(
+            i,
+            duration: Duration(milliseconds: 350),
+            curve: Curves.easeInOutCubic,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AnimatedNavBar extends StatelessWidget {
+  final AppTheme theme;
+  final int page;
+  final List<String> labels;
+  final List<IconData> icons;
+  final ValueChanged<int> onTap;
+
+  const _AnimatedNavBar({
+    required this.theme,
+    required this.page,
+    required this.labels,
+    required this.icons,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 72,
+      decoration: BoxDecoration(
+        color: theme.surfaceLight,
+        border: Border(top: BorderSide(color: theme.cardBorder, width: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: theme.primary.withAlpha(6),
+            blurRadius: 24,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: List.generate(labels.length, (i) {
+          final selected = page == i;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onTap(i),
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                margin: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: selected ? theme.primary.withAlpha(15) : Colors.transparent,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (selected)
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: theme.primary.withAlpha(30),
+                                  blurRadius: 12,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                        Icon(
+                          icons[i],
+                          size: selected ? 24 : 22,
+                          color: selected ? theme.primary : theme.textMuted,
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      labels[i],
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                        color: selected ? theme.primary : theme.textMuted,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

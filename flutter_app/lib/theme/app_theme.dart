@@ -66,15 +66,28 @@ class AppTheme {
   Color get onPrimary =>
       primary.computeLuminance() > 0.5 ? const Color(0xFF0A0A0C) : Colors.white;
 
+  static const _defaultTextTheme = TextTheme(
+    headlineLarge: TextStyle(fontWeight: FontWeight.w300, letterSpacing: -0.5),
+    headlineMedium: TextStyle(fontWeight: FontWeight.w400, letterSpacing: -0.25),
+    titleLarge: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.15),
+    titleMedium: TextStyle(fontWeight: FontWeight.w500, letterSpacing: 0.1),
+    bodyLarge: TextStyle(letterSpacing: 0.3),
+    bodyMedium: TextStyle(letterSpacing: 0.2),
+    bodySmall: TextStyle(letterSpacing: 0.3),
+    labelLarge: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.5),
+    labelSmall: TextStyle(letterSpacing: 0.5),
+  );
+
   ThemeData get themeData => ThemeData(
     brightness: brightness,
     useMaterial3: true,
     colorSchemeSeed: primary,
     scaffoldBackgroundColor: surface,
     appBarTheme: AppBarTheme(
-      backgroundColor: surfaceLight,
+      backgroundColor: Colors.transparent,
       elevation: 0,
       centerTitle: true,
+      scrolledUnderElevation: 0,
       titleTextStyle: GoogleFonts.inter(
         color: textPrimary,
         fontSize: 16,
@@ -88,70 +101,85 @@ class AppTheme {
       selectedItemColor: primary,
       unselectedItemColor: textMuted,
       type: BottomNavigationBarType.fixed,
+      elevation: 0,
+      selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+      unselectedLabelStyle: TextStyle(fontSize: 10, fontWeight: FontWeight.w400, letterSpacing: 0.3),
     ),
     cardTheme: CardThemeData(
       color: card,
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: cardBorder)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cardBorder),
+      ),
     ),
     dividerTheme: DividerThemeData(color: cardBorder, thickness: 1),
+    // V11's richer style set, colourised, then wrapped in Inter for the
+    // premium cluster typography.
     textTheme: GoogleFonts.interTextTheme(
-      TextTheme(
-        headlineLarge: TextStyle(color: textPrimary, fontWeight: FontWeight.w200, letterSpacing: 1.5),
-        headlineMedium: TextStyle(color: textPrimary, fontWeight: FontWeight.w300, letterSpacing: 1.0),
-        titleLarge: TextStyle(color: textPrimary, fontWeight: FontWeight.w600, letterSpacing: 0.5),
-        titleMedium: TextStyle(color: textPrimary, fontWeight: FontWeight.w500),
-        bodyLarge: TextStyle(color: textPrimary),
-        bodyMedium: TextStyle(color: textSecondary),
-        bodySmall: TextStyle(color: textMuted),
+      _defaultTextTheme.apply(
+        bodyColor: textPrimary,
+        displayColor: textPrimary,
       ),
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? primary : textMuted),
-      trackColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? primary.withAlpha(60) : cardBorder),
+      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? primary : textMuted),
+      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? primary.withAlpha(60) : cardBorder),
     ),
     sliderTheme: SliderThemeData(
       activeTrackColor: primary,
       inactiveTrackColor: cardBorder,
       thumbColor: primary,
       overlayColor: primary.withAlpha(30),
+      trackHeight: 4,
+      thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8),
+      overlayShape: RoundSliderOverlayShape(overlayRadius: 16),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: surface,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: cardBorder),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: cardBorder),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: primary, width: 1.5),
       ),
-      labelStyle: TextStyle(color: textMuted, fontSize: 12),
-      hintStyle: TextStyle(color: textMuted.withAlpha(150), fontSize: 13),
+      labelStyle: TextStyle(color: textMuted, fontSize: 12, letterSpacing: 0.3),
+      hintStyle: TextStyle(color: textMuted.withAlpha(120), fontSize: 13, letterSpacing: 0.2),
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: card,
       selectedColor: primary.withAlpha(40),
-      labelStyle: TextStyle(color: textSecondary, fontSize: 12),
+      labelStyle: TextStyle(color: textSecondary, fontSize: 12, letterSpacing: 0.3),
       side: BorderSide(color: cardBorder),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: card,
       contentTextStyle: TextStyle(color: textPrimary),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       behavior: SnackBarBehavior.floating,
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(color: primary),
+    popupMenuTheme: PopupMenuThemeData(
+      color: card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    ),
+    timePickerTheme: TimePickerThemeData(
+      backgroundColor: card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    ),
   );
 
   static const starTrail = AppTheme(

@@ -303,21 +303,26 @@ void ota_init() {
   webServer->on("/api/status", HTTP_GET, []() {
     int16_t mx = 0, my = 0, mz = 0;
     extern void sensors_get_mag_raw(int16_t *, int16_t *, int16_t *);
+    extern void sensors_get_accel(float *, float *, float *);
     sensors_get_mag_raw(&mx, &my, &mz);
+    float ax = 0, ay = 0, az = 0;
+    sensors_get_accel(&ax, &ay, &az);
 
     struct tm ti;
     char timeBuf[20] = "N/A";
     if (getLocalTime(&ti))
       strftime(timeBuf, sizeof(timeBuf), "%H:%M:%S", &ti);
 
-    char json[384];
+    char json[512];
     snprintf(json, sizeof(json),
              "{\"heading\":%.1f,\"pitch\":%.1f,\"roll\":%.1f,\"temp\":%.1f,"
              "\"alt_ft\":%.1f,\"pressure\":%.1f,\"mx\":%d,\"my\":%d,\"mz\":%d,"
+             "\"ax\":%.3f,\"ay\":%.3f,\"az\":%.3f,"
              "\"ip\":\"%s\",\"rssi\":%d,\"ssid\":\"%s\",\"time\":\"%s\","
              "\"uptime\":%lu,\"heap\":%u}",
              (float)gH, (float)gP, (float)gR, (float)gT, (float)gA * 3.28084f,
-             (float)gPr, mx, my, mz, WiFi.localIP().toString().c_str(),
+             (float)gPr, mx, my, mz, ax, ay, az,
+             WiFi.localIP().toString().c_str(),
              WiFi.RSSI(), WiFi.SSID().c_str(), timeBuf, millis() / 1000,
              ESP.getFreeHeap());
     webServer->send(200, "application/json", json);
@@ -339,6 +344,49 @@ void ota_init() {
     extern void wifi_sync_time();
     wifi_sync_time();
     webServer->send(200, "text/plain", "NTP synced");
+  });
+
+  // LED control
+  webServer->on("/api/led", HTTP_GET, []() {
+    extern void leds_set_mode(int);
+    extern void leds_set_brightness(int);
+    extern void leds_set_color(uint32_t);
+    if (webServer->hasArg("state")) {
+      String s = webServer->arg("state");
+      leds_set_mode(s == "on" ? 7 : 0);
+    }
+    if (webServer->hasArg("color")) {
+      uint32_t c = strtoul(webServer->arg("color").c_str(), NULL, 16);
+      leds_set_color(c);
+    }
+    if (webServer->hasArg("brightness")) {
+      leds_set_brightness(webServer->arg("brightness").toInt());
+    }
+    webServer->send(200, "text/plain", "OK");
+  });
+
+  // Screen timeout
+  static int screenTimeout = 0;
+  webServer->on("/api/timeout", HTTP_GET, []() {
+    screenTimeout = webServer->arg("v").toInt();
+    webServer->send(200, "text/plain", "OK");
+  });
+
+  // App version info (for Flutter auto-update)
+  webServer->on("/api/app-version", HTTP_GET, []() {
+    webServer->send(200, "application/json",
+      "{\"latest_version\":\"1.0.1\",\"latest_build\":2,"
+      "\"apk_url\":\"https://github.com/edgehax/star_trail/releases/latest\","
+      "\"changelog\":\"Real firmware OTA upload via file picker. "
+      "App auto-update via GitHub Releases. "
+      "Premium glassmorphism UI. "
+      "Fixed BLE command routing. "
+      "Added widget and system config screens.\"}");
+  });
+
+  // Widget config
+  webServer->on("/api/widgets", HTTP_GET, []() {
+    webServer->send(200, "text/plain", "OK");
   });
 
   // Gyro zero reset

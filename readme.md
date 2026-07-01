@@ -1,107 +1,184 @@
-### 1, Product picture
+# Star Trail Instrument Cluster
 
-![feature_of_1.28inch_rotary_knob_screen](feature_of_1.28inch_rotary_knob_screen.jpg)
+A premium digital instrument cluster for the **CrowPanel 1.28" Round ESP32-S3 Display** — a complete automotive HUD replacement with a companion mobile app.
 
-### 2, Product version number
+```
+ESP32-S3 (BenzCluster firmware)    ◄── BLE/WiFi ──►    Flutter App (star_trail)
+├── 7 LVGL widgets on 240x240 GC9A01              ├── Real-time dashboard mirror
+├── MPU9250 9-DOF + BME280 sensors                ├── Widget/LED/System controls
+├── 5x NeoPixel status LEDs                       ├── OTA firmware updates
+├── BLE HID media keys                            └── BLE scan + WiFi connect
+├── BLE phone notifications
+├── WiFi web dashboard + REST API
+└── Rotary encoder navigation
+```
 
-|      | Hardware | Software | Remark |
-| ---- | -------- | -------- | ------ |
-| 1    | V1.0     | V1.0     | latest |
+## Features
 
-### 3, product information
+### Hardware
+- **Display:** 1.28" round GC9A01 (240x240) SPI display
+- **Sensors:** MPU9250 (accelerometer + gyroscope + magnetometer), BME280 (temperature, humidity, pressure, altitude)
+- **Input:** Rotary encoder with push button, capacitive touch (CST816D)
+- **Lighting:** 5 individually addressable NeoPixel LEDs
+- **Connectivity:** WiFi (ESP32-S3), BLE (NimBLE stack)
 
-#### Display Module Specifications
+### Firmware (BenzCluster)
+- 7 swipeable LVGL widgets: **Clock, Compass, Attitude Indicator, Altitude/Temperature, G-Force, Music Remote, Airplane**
+- 3 clock faces (digital, analog, minimal)
+- ICAO-standard attitude indicator
+- BLE HID media control (play/pause/next/prev/volume)
+- BLE phone notification display
+- WiFi web dashboard with REST API on port 80
+- OTA firmware updates over WiFi
+- Rotary encoder for brightness, volume, widget navigation
+- 3-second encoder hold for system overlay (sensor viewer, system info, calibration)
 
-| Main Chip: ESP32-S3R8  |                                                              |
-| ---------------------- | ------------------------------------------------------------ |
-| Processor              | Equipped with high-performance Xtensa 32-bit LX7 dual-core processor, with a main frequency of up to 240MHz |
-| System memory          | 512KB SRAM、8M PSRAM                                         |
-| Storage                | 16M Flash                                                    |
-| Screen                 |                                                              |
-| Size                   | 1.28 inch                                                    |
-| Screen Type            | IPS                                                          |
-| Touch Type             | Capacitive Touch                                             |
-| Resolution             | 240*240                                                      |
-| Wireless Communication |                                                              |
-| Bluetooth              | Bluetooth Low Energy and Bluetooth 5.0                       |
-| WiFi                   | Support 802.11a/b/g/n，2.4GH                                 |
-| Hardware               |                                                              |
-| UART Interface         | 2x UART, 4P 1.25mm                                           |
-| I2C interface          | 4P 1.25mm                                                    |
-| FPC connector          | 12P, Power supply burning port                               |
-| Button                 | RESET button, BOOT button, confirmation button (knob press switch) |
-| LED Light              | Power indicator, LED ambient light                           |
-| Other                  |                                                              |
-| Power Input            | 5V/1A                                                        |
-| Operating temperature  | -20~65℃                                                      |
-| Storage temperature    | -40~80℃                                                      |
-| Operation Power        | Module：DC5V  Main Chip：3.3V                                |
-| Size                   | 48*48*33mm                                                   |
-| Shell                  | Aluminum alloy + plastic + acrylic                           |
-| Net Weight             | 50g                                                          |
+### Companion App (star_trail)
+- Real-time dashboard mirror with animated gauges
+- 3 themes: **Star Trail** (Mercedes cyan/blue), **Illuminati** (VW red), **DR** (personal purple)
+- Glassmorphism UI with premium automotive HUD aesthetic
+- Widget configuration (enable/disable, reorder, swipe direction, knob mode)
+- LED control (color picker, patterns, brightness, speed)
+- System settings (display brightness, screen timeout, WiFi config, device info)
+- OTA firmware update upload (file picker + progress bar)
+- Auto-update via GitHub Releases (checks for new APK versions, downloads & installs)
+- Connection via BLE scan, WiFi IP, or built-in simulator mode
 
-### 4, Use the driver module
+## Quick Start
 
-### 5,Quick Start
+### Prerequisites
+- CrowPanel 1.28" ESP32-S3 Round Display
+- Arduino IDE (with ESP32-S3 board support) or PlatformIO
+- Flutter SDK 3.12.2+ (for companion app)
+- USB-C cable
 
-##### Arduino IDE starts
+### Flash Firmware (Arduino IDE)
+1. Open `BenzCluster/BenzCluster.ino` in Arduino IDE
+2. Install required libraries:
+   - Adafruit NeoPixel 1.15.3+
+   - ArduinoJson 7.4.2+
+   - LovyanGFX 1.2.19+
+   - lvgl 8.3.11
+   - NimBLE-Arduino 2.3.7+
+   - ESPAsyncWebServer 3.1.0+
+3. Board: **ESP32-S3 Dev Module**
+4. Partition Scheme: **Huge APP (3MB No OTA/1MB SPIFFS)** (or use `partitions.csv` for dual OTA)
+5. Select the correct COM port
+6. Click **Upload**
 
-1.Download the library files used by this product to the 'libraries' folder.
+### Build Companion App
+```bash
+cd flutter_app/
 
-C:\Users\Documents\Arduino\libraries\
+# Analyze for errors
+flutter analyze
 
-![2](https://github.com/user-attachments/assets/86c568bb-3921-4a07-ae91-62d7ce752e50)
+# Debug APK
+flutter build apk --debug
 
+# Release APK
+flutter build apk --release
 
+# Or run on connected device
+flutter run
+```
 
-2.Open the Arduino IDE
+The release APK will be at `flutter_app/build/app/outputs/flutter-apk/app-release.apk`.
 
-![CrowPanel1.28inchRotary-1](CrowPanel1.28inchRotary-1.webp)
+### OTA Update (from CLI)
+```bash
+python BenzCluster/ota_upload.py --ip 192.168.x.x --bin build/BenzCluster.ino.bin
+```
 
-3.Open the code configuration environment and burn it.
+## Architecture
 
-![Snipaste_2025-08-18_18-37-15](Snipaste_2025-08-18_18-37-15.png)
+### Communication
+The ESP32-S3 runs a WiFi access point (or connects to your network) with a REST API server on port 80, and simultaneously acts as a BLE peripheral broadcasting sensor data and accepting commands. The Flutter app connects via either channel.
 
+### REST API Endpoints
+| Endpoint | Method | Params | Description |
+|----------|--------|--------|-------------|
+| `/api/status` | GET | — | Full sensor + system JSON |
+| `/api/led` | GET | `state`, `color`, `brightness`, `pattern`, `speed` | LED control |
+| `/api/brightness` | GET | `v` | Display brightness |
+| `/api/timeout` | GET | `v` | Screen timeout seconds |
+| `/api/music` | GET | `cmd` | Media commands (play/next/prev/vol_up/vol_down) |
+| `/api/widgets` | GET | `enabled`, `order`, `swipe`, `knob` | Widget configuration |
+| `/api/app-version` | GET | — | Returns Flutter app version info for auto-update |
+| `/reboot` | GET | — | Reboot device |
+| `/update` | POST | firmware.bin | OTA firmware update |
 
+### BLE Protocol
+- **Notify characteristic:** Broadcasts JSON with `heading`, `pitch`, `roll`, `temp`, `alt_ft`, `pressure`, accelerometer/magnetometer raw data, uptime, heap, RSSI, IP, SSID
+- **Write characteristic:** Accepts commands matching the REST API path format
 
-### 6,Folder structure.
+### Widget System
+The firmware renders 7 widgets swipeable on the round display. Each widget is a separate LVGL screen created in its own `.cpp`/`.h` file pair. The companion app mirrors these with `CustomPainter` implementations.
 
-|--3D file： Contains 3D model files (.stp) for the hardware. These files can be used for visualization, enclosure design, or integration into CAD software.
+## Hardware Pinout
 
-|--Datasheet: Includes datasheets for components used in the project, providing detailed specifications, electrical characteristics, and pin configurations.
+| Component | Interface | Pins |
+|-----------|-----------|------|
+| GC9A01 Display | SPI | SCLK=10, MOSI=11, DC=3, CS=9, RST=14, BL=46 |
+| CST816D Touch | I2C (Wire1) | SDA=6, SCL=7, RST=13, INT=5 |
+| MPU9250 | I2C (Wire) | SDA=38, SCL=39, ADDR=0x68 |
+| QMC5883L | I2C (Wire) | ADDR=0x0D |
+| BME280 | I2C (Wire) | ADDR=0x76 |
+| Rotary Encoder | GPIO | A=45, B=42, SW=41 |
+| NeoPixel | GPIO | PIN=48, COUNT=5 |
 
-|--Eagle_SCH&PCB: Contains **Eagle CAD** schematic (`.sch`) and PCB layout (`.brd`) files. These are used for circuit design and PCB manufacturing.
+## Project Structure
 
-|--example: Provides example code and projects to demonstrate how to use the hardware and libraries. These examples help users get started quickly.
+```
+CrowPanel_Repo/
+├── BenzCluster/          ESP32-S3 firmware (Arduino sketch)
+├── flutter_app/          Flutter companion app (star_trail)
+├── Datasheet/            Component datasheets
+├── Eagle_SCH&PCB/        Circuit schematic and PCB layout
+├── 3D file/              Enclosure STEP model
+├── simulator/            PC LVGL simulator
+├── factory_firmware/     Pre-compiled factory binaries + flash tool
+├── factory_soucecode/    Factory SquareLine Studio project
+├── example/              Example sketches and third-party libraries
+└── SensorDiag/           Standalone sensor diagnostic tool
+```
 
-|--factory_firmware: Stores pre-compiled factory firmware that can be directly flashed onto the device. This ensures the device runs the default functionality.
+## CI/CD & Release
 
-|--factory_sourcecode: Contains the source code for the factory firmware, allowing users to modify and rebuild the firmware as needed.
+### Building for Release
 
-### 7,Pin definition
+**Firmware**
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32s3 --partitions-scheme huge_app BenzCluster/
+```
 
-#define TP_I2C_SDA_PIN 6
+**Flutter APK**
+```bash
+cd flutter_app/
+flutter build apk --release --build-name=1.0.1 --build-number=2
+```
 
-#define TP_I2C_SCL_PIN 7
+Release APK: `flutter_app/build/app/outputs/flutter-apk/app-release.apk` (50.7MB)
+Debug APK: `flutter_app/build/app/outputs/flutter-apk/app-debug.apk`
 
-#define I2C_SDA_PIN 38
+### Creating a GitHub Release
+1. Build firmware and APK (commands above)
+2. Create a GitHub Release with tag `v1.0.1` (match `--build-name`)
+3. Upload `app-release.apk` as a release asset
+4. Set `GITHUB_REPO=edgehax/star_trail` in `lib/services/update_service.dart` (update to your repo)
+5. Users' apps auto-detect the new version on next launch
 
-#define I2C_SCL_PIN 39
+### Auto-Update Flow
+- `UpdateService` checks GitHub API for latest release on app launch
+- Compares versions semantically against installed app version
+- If newer, downloads APK to temp directory and opens via Android FileProvider
+- Requires Android 7+ (FileProvider for secure APK install)
 
+### Verification
+- `flutter analyze` — 0 issues
+- `flutter test` — 19 tests pass
+- Firmware: ESP32-S3 Huge APP partition, ~57% flash usage
 
+## License
 
-#define ENCODER_A_PIN 45
-
-#define ENCODER_B_PIN 42
-
-#define SWITCH_PIN 41
-
-
-
-#define OLED_RESET -1
-
-#define SCREEN_WIDTH 128     // OLED display width, in pixels
-
-#define SCREEN_HEIGHT 64     // OLED display height, in pixels
-
-#define SCREEN_ADDRESS 0x3C  ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+Private project. All rights reserved.

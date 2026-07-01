@@ -12,8 +12,8 @@ class ClockPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (face == 0) {
       _drawAnalog(canvas);
-    } else if (face == 1) _drawDigital(canvas);
-    else _drawMinimal(canvas);
+    } else if (face == 1) { _drawDigital(canvas); }
+    else { _drawMinimal(canvas); }
   }
 
   void _drawAnalog(Canvas canvas) {
