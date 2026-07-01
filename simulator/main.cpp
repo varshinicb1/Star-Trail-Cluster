@@ -29,9 +29,9 @@ static SDL_Texture *texture = nullptr;
 static lv_color_t *buf1 = nullptr;
 #define BUF_SIZE (240 * 240)
 
-// Persistent framebuffer for headless screenshot capture (ARGB8888, as stored
-// by LVGL at 32-bit). Updated on every flush so partial redraws accumulate.
-static uint32_t g_fb[240 * 240];
+// Persistent framebuffer for headless screenshot capture (RGB565, as stored by
+// LVGL). Updated on every flush so partial redraws accumulate.
+static uint16_t g_fb[240 * 240];
 
 // When true (screenshot mode) the flush callback skips all SDL calls so the
 // simulator can render headlessly with no window/display available.
@@ -56,8 +56,8 @@ static void disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *c
   lv_disp_flush_ready(disp);
 }
 
-// Write the current framebuffer to a 24-bit BMP (no external deps). The 32-bit
-// framebuffer stores ARGB8888 (0xAARRGGBB), matching SDL's ARGB8888 texture.
+// Write the current framebuffer to a 24-bit BMP (no external deps). g_fb holds
+// RGB565 exactly as SDL renders it, so decode directly.
 static void save_bmp(const char *path) {
   const int W = 240, H = 240;
   const int rowSize = (W * 3 + 3) & ~3;  // padded to 4 bytes
@@ -80,10 +80,10 @@ static void save_bmp(const char *path) {
   for (int y = H - 1; y >= 0; y--) {  // BMP is bottom-up
     memset(row, 0, rowSize);
     for (int x = 0; x < W; x++) {
-      uint32_t c = g_fb[y * W + x];  // 0xAARRGGBB
-      unsigned char r = (c >> 16) & 0xFF;
-      unsigned char g = (c >> 8) & 0xFF;
-      unsigned char b = c & 0xFF;
+      uint16_t c = g_fb[y * W + x];  // RGB565
+      unsigned char r = ((c >> 11) & 0x1F) << 3;
+      unsigned char g = ((c >> 5) & 0x3F) << 2;
+      unsigned char b = (c & 0x1F) << 3;
       row[x * 3 + 0] = b;  // BMP stores BGR
       row[x * 3 + 1] = g;
       row[x * 3 + 2] = r;
@@ -173,7 +173,7 @@ int main(int argc, char **argv) {
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     SDL_RenderSetLogicalSize(renderer, 240, 240);
 
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB565,
       SDL_TEXTUREACCESS_STREAMING, 240, 240);
   }
 

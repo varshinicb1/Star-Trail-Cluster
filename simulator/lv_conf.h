@@ -1,11 +1,11 @@
 #ifndef LV_CONF_H
 #define LV_CONF_H
 
-// Render at 32-bit on the PC. The device is RGB565, but 16-bit in the sim ran
-// into LVGL byte-swap/gradient-interpolation quirks (rainbow banding). 32-bit
-// ARGB gives accurate, swap-free colours and smoother gradients while showing
-// the exact same widget layouts. SDL captures ARGB8888 directly.
-#define LV_COLOR_DEPTH 32
+// Match the device: 16-bit RGB565, no byte swap. SWAP=0 fixes the gradient
+// interpolation (attitude sky/ground rainbow); the framebuffer is captured as
+// RGB565 directly.
+#define LV_COLOR_DEPTH 16
+#define LV_COLOR_16_SWAP 0
 #define LV_DRAW_COMPLEX 1
 #define LV_HOR_RES_MAX 240
 #define LV_VER_RES_MAX 240
