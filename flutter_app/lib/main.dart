@@ -8,6 +8,7 @@ import 'screens/home_screen.dart';
 import 'screens/config_screen.dart';
 import 'screens/ota_screen.dart';
 import 'screens/device_controls_screen.dart';
+import 'screens/designer_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +37,7 @@ class StarTrailApp extends StatelessWidget {
             '/home': (_) => const AppShell(),
             '/config': (_) => const ConfigScreen(),
             '/ota': (_) => const OTAScreen(),
+            '/designer': (_) => const DesignerScreen(),
           },
         ),
       ),
@@ -53,9 +55,9 @@ class _AppShellState extends State<AppShell> {
   int _page = 0;
   final PageController _pageController = PageController();
 
-  final _pages = const [HomeScreen(), DeviceControlsScreen(), OTAScreen()];
-  final _labels = ['Dashboard', 'Controls', 'OTA'];
-  final _icons = [Icons.speed, Icons.tune, Icons.system_update];
+  final _pages = const [HomeScreen(), DesignerScreen(), DeviceControlsScreen(), OTAScreen()];
+  final _labels = ['Dashboard', 'Designer', 'Controls', 'OTA'];
+  final _icons = [Icons.speed, Icons.draw, Icons.tune, Icons.system_update];
 
   @override
   void dispose() {
@@ -90,7 +92,7 @@ class _AppShellState extends State<AppShell> {
             );
             setState(() => _page = i);
           },
-          items: List.generate(3, (i) => BottomNavigationBarItem(
+          items: List.generate(_pages.length, (i) => BottomNavigationBarItem(
             icon: Icon(_icons[i], size: 20),
             activeIcon: Icon(_icons[i], size: 24),
             label: _labels[i],

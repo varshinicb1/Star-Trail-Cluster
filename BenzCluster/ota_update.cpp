@@ -5,6 +5,9 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
+#include "custom_screen.h"
+#include "custom_widget.h"
+
 static WebServer *webServer = nullptr;
 
 // Serial log ring buffer for web serial monitor
@@ -368,6 +371,25 @@ void ota_init() {
     screenBrightness = constrain(v, 10, 100);
     display_set_brightness(screenBrightness);
     webServer->send(200, "text/plain", "OK");
+  });
+
+  // Custom widget layout push (WiFi fallback for the app designer).
+  // Body is the raw JSON layout document.
+  webServer->on("/api/custom_layout", HTTP_POST, []() {
+    String body = webServer->arg("plain");
+    if (body.length() == 0) {
+      webServer->send(400, "text/plain", "Empty layout");
+      return;
+    }
+    CwLayout tmp;
+    if (!cw_parse_json(body.c_str(), body.length(), &tmp)) {
+      webServer->send(400, "text/plain", "Invalid layout JSON");
+      return;
+    }
+    cw_save(&tmp);
+    custom_screen_reload();
+    Serial.println("[CUSTOM] Applied layout from WiFi");
+    webServer->send(200, "text/plain", "Layout applied");
   });
 
   // OTA Firmware upload

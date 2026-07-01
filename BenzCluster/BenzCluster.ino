@@ -32,6 +32,8 @@
 #include "clock.h"
 #include "compass.h"
 #include "config.h"
+#include "custom_screen.h"
+#include "custom_widget.h"
 #include "display.h"
 #include "gforce.h"
 #include "leds.h"
@@ -43,7 +45,7 @@
 #include "systemview.h"
 #include "wifi_manager.h"
 
-#define NUM_WIDGETS 7
+#define NUM_WIDGETS 8
 #define W_CLOCK 0
 #define W_COMPASS 1
 #define W_ATTITUDE 2
@@ -51,6 +53,7 @@
 #define W_GFORCE 4
 #define W_MUSIC 5
 #define W_AIRPLANE 6
+#define W_CUSTOM 7
 
 int currentWidget = 0;
 int brightness = 50;
@@ -69,8 +72,8 @@ void sensorTask(void *p);
 void ledTask(void *p);
 void switchWidget(int dir);
 
-static const char *wName[] = {"Clock",   "Compass", "Attitude",
-                              "AltTemp", "G-Force", "Music", "Airplane"};
+static const char *wName[] = {"Clock",   "Compass", "Attitude", "AltTemp",
+                              "G-Force", "Music",   "Airplane", "Custom"};
 
 // BLE notification toast overlay
 static lv_obj_t *toastObj = NULL;
@@ -164,6 +167,7 @@ void setup() {
   airplane_init();
   sensorview_init();
   systemview_init();
+  custom_screen_init();
 
   // Restore last widget from SPIFFS
   int savedWidget = 0;
@@ -197,6 +201,12 @@ void setup() {
   case W_GFORCE:
     gforce_show();
     break;
+  case W_AIRPLANE:
+    airplane_show();
+    break;
+  case W_CUSTOM:
+    custom_screen_show();
+    break;
   }
   Serial.printf("[UI] %s (%d/%d)\n", wName[currentWidget], currentWidget + 1,
                 NUM_WIDGETS);
@@ -219,6 +229,22 @@ void loop() {
   if (toastObj && toastShowTime > 0 && millis() - toastShowTime > 4000) {
     lv_obj_add_flag(toastObj, LV_OBJ_FLAG_HIDDEN);
     toastShowTime = 0;
+  }
+
+  // === Custom widget layout pushed over BLE ===
+  {
+    String layoutJson;
+    if (ble_custom_layout_take(layoutJson)) {
+      CwLayout tmp;
+      if (cw_parse_json(layoutJson.c_str(), layoutJson.length(), &tmp)) {
+        cw_save(&tmp);
+        custom_screen_reload();
+        showToast("Custom face updated");
+        Serial.println("[CUSTOM] Applied layout from BLE");
+      } else {
+        Serial.println("[CUSTOM] BLE layout parse failed");
+      }
+    }
   }
 
   // ===== Touch gestures =====
@@ -326,6 +352,9 @@ void loop() {
       case W_AIRPLANE:
         airplane_show();
         break;
+      case W_CUSTOM:
+        custom_screen_show();
+        break;
       }
       Serial.println("[UI] System overlay OFF (3s hold)");
     }
@@ -381,6 +410,9 @@ void loop() {
   case W_AIRPLANE:
     airplane_update(gP, gR, gH);
     break;
+  case W_CUSTOM:
+    custom_screen_update();
+    break;
   }
   delay(5);
 }
@@ -408,6 +440,9 @@ void switchWidget(int dir) {
   case W_AIRPLANE:
     airplane_hide();
     break;
+  case W_CUSTOM:
+    custom_screen_hide();
+    break;
   }
   currentWidget = (currentWidget + dir + NUM_WIDGETS) % NUM_WIDGETS;
   switch (currentWidget) {
@@ -431,6 +466,9 @@ void switchWidget(int dir) {
     break;
   case W_AIRPLANE:
     airplane_show();
+    break;
+  case W_CUSTOM:
+    custom_screen_show();
     break;
   }
   Serial.printf("[UI] %s (%d/%d)\n", wName[currentWidget], currentWidget + 1,
