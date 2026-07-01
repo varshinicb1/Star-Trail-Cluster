@@ -21,3 +21,7 @@ desktop.ini
 
 # Playwright MCP screenshot artifacts
 .playwright-mcp/
+
+# LVGL simulator build + scratch renders
+simulator/build/
+simulator/shots/

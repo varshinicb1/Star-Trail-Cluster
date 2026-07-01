@@ -14,6 +14,9 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/lvgl/lvgl.git
   GIT_TAG v8.3.9
 )
+# PC-portable LVGL config (the firmware's lv_conf.h uses ESP32-only attributes
+# that MSVC can't parse). Kept in sync with the firmware's rendering settings:
+# same 16-bit colour depth, no byte swap, gradients on.
 set(LV_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h CACHE INTERNAL "")
 FetchContent_MakeAvailable(lvgl)
 
