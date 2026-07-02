@@ -5,165 +5,90 @@
 #include <math.h>
 #include <stdio.h>
 
-static lv_obj_t *compassScreen = NULL;
-static lv_obj_t *degreeLabel = NULL;
-static lv_obj_t *cardinalLabel = NULL;
-
-// Rotating ring objects
-#define NUM_COMPASS_TICKS 36
-#define NUM_COMPASS_LETTERS 4
-#define NUM_COMPASS_NUMS 8
-#define NUM_DOTS 36
-
-static lv_obj_t *tickLines[NUM_COMPASS_TICKS];
-static lv_obj_t *dotObjs[NUM_DOTS];
-static lv_obj_t *letterLabels[NUM_COMPASS_LETTERS];
-static lv_obj_t *numLabels[NUM_COMPASS_NUMS];
-
-// Airplane symbol (static at center)
-static lv_obj_t *planeBody = NULL;
-static lv_obj_t *planeWingL = NULL;
-static lv_obj_t *planeWingR = NULL;
-static lv_obj_t *planeTail = NULL;
-static lv_obj_t *planeCenter = NULL;
-
-// Bezel rings
-static lv_obj_t *outerRing = NULL;
-static lv_obj_t *innerRing = NULL;
-
-static float lastHeading = -999;
-static float smoothHeading = 0;
+// ============================================================================
+// Linear scrolling compass (car-dashboard style).
+//   Pure-black background, a horizontal WHITE scale that scrolls, a fixed RED
+//   needle always at centre, and the WHITE heading value below.
+//   Ticks every 15 deg (minor), labelled cardinals/intercardinals every 45 deg.
+//   The whole 0..360 wraps seamlessly through centre.
+// ============================================================================
 
 #define CX 120
-#define CY 120
+#define BASE_Y 96           // baseline (top) of the tick band
+#define PX_PER_DEG 2.6f     // ~92 deg visible across the round face
+#define HALF_VIS 118        // clip ticks beyond this from centre (round bezel)
 
-static const char *cardinalNames[] = {"N", "E", "S", "W"};
-static const int cardinalDegs[] = {0, 90, 180, 270};
+#define N_TICKS 24          // one every 15 deg
+#define N_LABELS 8          // one every 45 deg
 
-static const int numDegs[] = {30, 60, 120, 150, 210, 240, 300, 330};
-static const char *numTexts[] = {"3", "6", "12", "15", "21", "24", "30", "33"};
+static lv_obj_t *compassScreen = NULL;
+static lv_obj_t *needle = NULL;
+static lv_obj_t *ticks[N_TICKS];
+static lv_obj_t *labels[N_LABELS];
+static lv_obj_t *headingLabel = NULL;
+static lv_obj_t *degLabel = NULL;
 
-static void posOnCircle(int degOffset, float radius, int *x, int *y) {
-  float rad = (degOffset - 90) * M_PI / 180.0f;
-  *x = CX + (int)(cosf(rad) * radius);
-  *y = CY + (int)(sinf(rad) * radius);
+static const char *cardinalNames[N_LABELS] = {"N", "NE", "E", "SE",
+                                              "S", "SW", "W", "NW"};
+
+// Shortest signed angular difference a-b in (-180,180].
+static float angDiff(float a, float b) {
+  float d = a - b;
+  while (d > 180.0f) d -= 360.0f;
+  while (d <= -180.0f) d += 360.0f;
+  return d;
 }
 
 void compass_init() {
   compassScreen = lv_obj_create(NULL);
-  lv_obj_set_style_bg_color(compassScreen, lv_color_hex(0x0A0A0A), 0);
+  lv_obj_set_style_bg_color(compassScreen, lv_color_black(), 0);
+  lv_obj_set_style_bg_opa(compassScreen, LV_OPA_COVER, 0);
   lv_obj_clear_flag(compassScreen, LV_OBJ_FLAG_SCROLLABLE);
 
-  // === Bezel rings (miercemk-style concentric) ===
-  outerRing = lv_obj_create(compassScreen);
-  lv_obj_set_size(outerRing, 234, 234);
-  lv_obj_align(outerRing, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_radius(outerRing, 117, 0);
-  lv_obj_set_style_bg_color(outerRing, lv_color_hex(0xAAAAAA), 0);
-  lv_obj_set_style_border_color(outerRing, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_set_style_border_width(outerRing, 1, 0);
-  lv_obj_clear_flag(outerRing, LV_OBJ_FLAG_SCROLLABLE);
-
-  innerRing = lv_obj_create(compassScreen);
-  lv_obj_set_size(innerRing, 222, 222);
-  lv_obj_align(innerRing, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_radius(innerRing, 111, 0);
-  lv_obj_set_style_bg_color(innerRing, lv_color_hex(0x2D3234), 0);
-  lv_obj_set_style_border_color(innerRing, lv_color_hex(0x0F0F0F), 0);
-  lv_obj_set_style_border_width(innerRing, 1, 0);
-  lv_obj_clear_flag(innerRing, LV_OBJ_FLAG_SCROLLABLE);
-
-  // === Tick marks (36 at 10 intervals) ===
-  for (int i = 0; i < NUM_COMPASS_TICKS; i++) {
-    tickLines[i] = lv_obj_create(compassScreen);
-    lv_obj_set_style_bg_color(tickLines[i], lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_border_width(tickLines[i], 0, 0);
-    lv_obj_set_style_radius(tickLines[i], 0, 0);
-    lv_obj_set_size(tickLines[i], 2, 10);
+  // Minor/major tick pool (white bars, repositioned each frame).
+  for (int i = 0; i < N_TICKS; i++) {
+    ticks[i] = lv_obj_create(compassScreen);
+    lv_obj_clear_flag(ticks[i], LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_border_width(ticks[i], 0, 0);
+    lv_obj_set_style_radius(ticks[i], 0, 0);
+    lv_obj_set_style_bg_color(ticks[i], lv_color_white(), 0);
+    lv_obj_set_style_bg_opa(ticks[i], LV_OPA_COVER, 0);
+    lv_obj_set_size(ticks[i], 2, 12);
   }
 
-  // === Dots at 5 intervals ===
-  for (int i = 0; i < NUM_DOTS; i++) {
-    dotObjs[i] = lv_obj_create(compassScreen);
-    lv_obj_set_size(dotObjs[i], 3, 3);
-    lv_obj_set_style_radius(dotObjs[i], 2, 0);
-    lv_obj_set_style_bg_color(dotObjs[i], lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_border_width(dotObjs[i], 0, 0);
-    lv_obj_set_style_bg_opa(dotObjs[i], LV_OPA_50, 0);
+  // Cardinal/intercardinal labels.
+  for (int i = 0; i < N_LABELS; i++) {
+    labels[i] = lv_label_create(compassScreen);
+    lv_obj_set_style_text_color(labels[i], lv_color_white(), 0);
+    lv_obj_set_style_text_font(labels[i], &lv_font_montserrat_18, 0);
+    lv_label_set_text(labels[i], cardinalNames[i]);
   }
 
-  // === Cardinal letters (N/E/S/W) ===
-  for (int i = 0; i < NUM_COMPASS_LETTERS; i++) {
-    letterLabels[i] = lv_label_create(compassScreen);
-    lv_label_set_text(letterLabels[i], cardinalNames[i]);
-    lv_obj_set_style_text_font(letterLabels[i], &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(letterLabels[i], lv_color_hex(0xFFDD00), 0);
-  }
+  // Fixed red centre needle.
+  needle = lv_obj_create(compassScreen);
+  lv_obj_clear_flag(needle, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_set_style_border_width(needle, 0, 0);
+  lv_obj_set_style_radius(needle, 1, 0);
+  lv_obj_set_style_bg_color(needle, lv_color_hex(0xE01020), 0);  // red
+  lv_obj_set_style_bg_opa(needle, LV_OPA_COVER, 0);
+  lv_obj_set_size(needle, 3, 40);
+  lv_obj_set_pos(needle, CX - 1, BASE_Y - 6);
 
-  // === Degree numbers (30/60/120/150/210/240/300/330) ===
-  for (int i = 0; i < NUM_COMPASS_NUMS; i++) {
-    numLabels[i] = lv_label_create(compassScreen);
-    lv_label_set_text(numLabels[i], numTexts[i]);
-    lv_obj_set_style_text_font(numLabels[i], &lv_font_montserrat_10, 0);
-    lv_obj_set_style_text_color(numLabels[i], lv_color_hex(0xBBBBBB), 0);
-  }
+  // Big white heading value below the scale.
+  headingLabel = lv_label_create(compassScreen);
+  lv_obj_set_style_text_color(headingLabel, lv_color_white(), 0);
+  lv_obj_set_style_text_font(headingLabel, &lv_font_montserrat_44, 0);
+  lv_label_set_text(headingLabel, "0");
+  lv_obj_align(headingLabel, LV_ALIGN_TOP_MID, 6, 150);
 
-  // === Airplane symbol (miercemk-style, static at center) ===
-  uint32_t acColor = 0xFFAA00;
-  // Fuselage (vertical line)
-  planeBody = lv_obj_create(compassScreen);
-  lv_obj_set_size(planeBody, 4, 90);
-  lv_obj_align(planeBody, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_bg_color(planeBody, lv_color_hex(acColor), 0);
-  lv_obj_set_style_border_width(planeBody, 0, 0);
-  lv_obj_set_style_radius(planeBody, 2, 0);
+  // Heading caption.
+  degLabel = lv_label_create(compassScreen);
+  lv_obj_set_style_text_color(degLabel, lv_color_hex(0x777777), 0);
+  lv_obj_set_style_text_font(degLabel, &lv_font_montserrat_14, 0);
+  lv_label_set_text(degLabel, "HEADING");
+  lv_obj_align(degLabel, LV_ALIGN_TOP_MID, 0, 205);
 
-  // Left wing
-  planeWingL = lv_obj_create(compassScreen);
-  lv_obj_set_size(planeWingL, 45, 4);
-  lv_obj_align(planeWingL, LV_ALIGN_CENTER, -30, 12);
-  lv_obj_set_style_bg_color(planeWingL, lv_color_hex(acColor), 0);
-  lv_obj_set_style_border_width(planeWingL, 0, 0);
-  lv_obj_set_style_radius(planeWingL, 2, 0);
-
-  // Right wing
-  planeWingR = lv_obj_create(compassScreen);
-  lv_obj_set_size(planeWingR, 45, 4);
-  lv_obj_align(planeWingR, LV_ALIGN_CENTER, 30, 12);
-  lv_obj_set_style_bg_color(planeWingR, lv_color_hex(acColor), 0);
-  lv_obj_set_style_border_width(planeWingR, 0, 0);
-  lv_obj_set_style_radius(planeWingR, 2, 0);
-
-  // Tail
-  planeTail = lv_obj_create(compassScreen);
-  lv_obj_set_size(planeTail, 3, 24);
-  lv_obj_align(planeTail, LV_ALIGN_CENTER, 0, -42);
-  lv_obj_set_style_bg_color(planeTail, lv_color_hex(acColor), 0);
-  lv_obj_set_style_border_width(planeTail, 0, 0);
-  lv_obj_set_style_radius(planeTail, 1, 0);
-  lv_obj_set_style_bg_opa(planeTail, LV_OPA_60, 0);
-
-  // Center dot
-  planeCenter = lv_obj_create(compassScreen);
-  lv_obj_set_size(planeCenter, 8, 8);
-  lv_obj_align(planeCenter, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_style_bg_color(planeCenter, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_set_style_border_width(planeCenter, 0, 0);
-  lv_obj_set_style_radius(planeCenter, 4, 0);
-
-  // === Heading degree label (top) ===
-  degreeLabel = lv_label_create(compassScreen);
-  lv_label_set_text(degreeLabel, "0\xC2\xB0");
-  lv_obj_set_style_text_font(degreeLabel, &lv_font_montserrat_24, 0);
-  lv_obj_set_style_text_color(degreeLabel, lv_color_hex(0xFFFFFF), 0);
-  lv_obj_align(degreeLabel, LV_ALIGN_CENTER, 0, -80);
-
-  // Cardinal label (below center)
-  cardinalLabel = lv_label_create(compassScreen);
-  lv_label_set_text(cardinalLabel, "N");
-  lv_obj_set_style_text_font(cardinalLabel, &lv_font_montserrat_18, 0);
-  lv_obj_set_style_text_color(cardinalLabel, lv_color_hex(0xFF4444), 0);
-  lv_obj_align(cardinalLabel, LV_ALIGN_CENTER, 0, 75);
+  compass_update(0);
 }
 
 void compass_show() {
@@ -174,65 +99,42 @@ void compass_show() {
 void compass_hide() {}
 
 void compass_update(float heading_in) {
-  float diff = heading_in - smoothHeading;
-  if (diff > 180) diff -= 360;
-  if (diff < -180) diff += 360;
-  smoothHeading += diff * 0.25f;
-  if (smoothHeading < 0) smoothHeading += 360;
-  if (smoothHeading >= 360) smoothHeading -= 360;
+  if (heading_in < 0) heading_in += 360.0f;
+  if (heading_in >= 360.0f) heading_in -= 360.0f;
 
-  if (fabs(smoothHeading - lastHeading) < 0.2f) return;
-  lastHeading = smoothHeading;
-
-  // Update heading label
-  char buf[16];
-  snprintf(buf, sizeof(buf), "%d\xC2\xB0", (int)(smoothHeading + 0.5f));
-  lv_label_set_text(degreeLabel, buf);
-  lv_obj_align(degreeLabel, LV_ALIGN_CENTER, 0, -80);
-
-  // Update cardinal label
-  int h = (int)(smoothHeading + 0.5f) % 360;
-  const char *card = "N";
-  if (h < 22 || h >= 337) card = "N";
-  else if (h < 67) card = "NE";
-  else if (h < 112) card = "E";
-  else if (h < 157) card = "SE";
-  else if (h < 202) card = "S";
-  else if (h < 247) card = "SW";
-  else if (h < 292) card = "W";
-  else card = "NW";
-  lv_label_set_text(cardinalLabel, card);
-  lv_obj_align(cardinalLabel, LV_ALIGN_CENTER, 0, 75);
-
-  // Position ticks (rotate around center based on heading)
-  for (int i = 0; i < NUM_COMPASS_TICKS; i++) {
-    int deg = (i * 10) - (int)smoothHeading;
-    int x, y;
-    posOnCircle(deg, 102, &x, &y);
-    lv_obj_set_pos(tickLines[i], x - 1, y - 5);
+  // Position each 15-deg tick relative to centre.
+  for (int i = 0; i < N_TICKS; i++) {
+    float tickHdg = i * 15.0f;
+    float d = angDiff(tickHdg, heading_in);       // -180..180
+    int x = CX + (int)lroundf(d * PX_PER_DEG);
+    bool major = (i % 3 == 0);                     // every 45 deg
+    if (abs(x - CX) > HALF_VIS) {
+      lv_obj_add_flag(ticks[i], LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_clear_flag(ticks[i], LV_OBJ_FLAG_HIDDEN);
+      int h = major ? 22 : 12;
+      lv_obj_set_size(ticks[i], major ? 3 : 2, h);
+      lv_obj_set_pos(ticks[i], x - 1, BASE_Y);
+    }
   }
 
-  // Position dots at 5, 15, 25...
-  for (int i = 0; i < NUM_DOTS; i++) {
-    int deg = (i * 10 + 5) - (int)smoothHeading;
-    int x, y;
-    posOnCircle(deg, 98, &x, &y);
-    lv_obj_set_pos(dotObjs[i], x - 1, y - 1);
+  // Labels sit under their major ticks.
+  for (int i = 0; i < N_LABELS; i++) {
+    float lblHdg = i * 45.0f;
+    float d = angDiff(lblHdg, heading_in);
+    int x = CX + (int)lroundf(d * PX_PER_DEG);
+    if (abs(x - CX) > HALF_VIS) {
+      lv_obj_add_flag(labels[i], LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_clear_flag(labels[i], LV_OBJ_FLAG_HIDDEN);
+      lv_obj_update_layout(labels[i]);
+      int w = lv_obj_get_width(labels[i]);
+      lv_obj_set_pos(labels[i], x - w / 2, BASE_Y + 26);
+    }
   }
 
-  // Position cardinal letters
-  for (int i = 0; i < NUM_COMPASS_LETTERS; i++) {
-    int deg = cardinalDegs[i] - (int)smoothHeading;
-    int x, y;
-    posOnCircle(deg, 82, &x, &y);
-    lv_obj_set_pos(letterLabels[i], x - 8, y - 8);
-  }
-
-  // Position degree numbers
-  for (int i = 0; i < NUM_COMPASS_NUMS; i++) {
-    int deg = numDegs[i] - (int)smoothHeading;
-    int x, y;
-    posOnCircle(deg, 78, &x, &y);
-    lv_obj_set_pos(numLabels[i], x - 6, y - 6);
-  }
+  // Heading number.
+  char buf[8];
+  snprintf(buf, sizeof(buf), "%d", (int)lroundf(heading_in) % 360);
+  lv_label_set_text(headingLabel, buf);
 }
