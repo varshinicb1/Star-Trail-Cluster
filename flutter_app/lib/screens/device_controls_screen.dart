@@ -6,6 +6,8 @@ import '../widgets/glass_container.dart';
 import 'controls/widget_screen.dart';
 import 'controls/led_screen.dart';
 import 'controls/system_screen.dart';
+import 'controls/attitude_style_screen.dart';
+import 'controls/factory_calibrate_screen.dart';
 
 class _MenuCard {
   final String title;
@@ -18,8 +20,10 @@ class _MenuCard {
 
 final _menuCards = [
   _MenuCard('Widget Settings', 'Arrange, toggle & configure widgets', Icons.grid_view, WidgetScreen(), Color(0xFF00CCFF)),
+  _MenuCard('Attitude Style', 'Pick your attitude-indicator face', Icons.flight, AttitudeStyleScreen(), Color(0xFF6FA8C7)),
   _MenuCard('LED Settings', 'LED colors, patterns & brightness', Icons.lightbulb, LEDScreen(), Color(0xFFFFAA00)),
   _MenuCard('System Settings', 'Display, WiFi, reboot & info', Icons.settings, SystemScreen(), Color(0xFF00FF88)),
+  _MenuCard('Factory Calibration', 'One-time mount + magnetometer setup', Icons.build_circle_outlined, FactoryCalibrateScreen(), Color(0xFFE01020)),
 ];
 
 class DeviceControlsScreen extends StatelessWidget {

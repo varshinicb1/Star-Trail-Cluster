@@ -6,7 +6,16 @@
 #include <string.h>
 
 #include "attitude.h"
+#include "ble_media.h"
+#include "calibration.h"
+#include "display.h"
+#include "leds.h"
 #include "sensors.h"
+
+// Globals owned by BenzCluster.ino — shared so BLE and HTTP commands stay in
+// perfect sync (both paths call into this file, never duplicate logic).
+extern int screenBrightness;
+extern bool calibrationMode;
 
 #define ATT_STYLE_FILE "/attitude_style.txt"
 
@@ -76,6 +85,81 @@ bool cluster_handle_command(const char *cmd, char *reply, int replyLen) {
 
   if (!strcmp(key, "debug_sensors")) {
     sensors_debug_string(reply, replyLen);
+    return true;
+  }
+
+  // --- Legacy control surface (LED / brightness / music / power) ---
+  // These mirror the HTTP routes in ota_update.cpp exactly, so BLE-only
+  // customers (no WiFi configured) get full control from the app too.
+  if (!strcmp(key, "led_on")) {
+    leds_set_mode(LED_MODE_CUSTOM);
+    snprintf(reply, replyLen, "led on");
+    return true;
+  }
+  if (!strcmp(key, "led_off")) {
+    leds_set_mode(LED_MODE_OFF);
+    snprintf(reply, replyLen, "led off");
+    return true;
+  }
+  if (!strcmp(key, "led_color")) {
+    char clean[16];
+    const char *src = val;
+    if (src[0] == '#') src++;
+    strncpy(clean, src, sizeof(clean) - 1);
+    clean[sizeof(clean) - 1] = '\0';
+    leds_set_color((uint32_t)strtoul(clean, nullptr, 16));
+    snprintf(reply, replyLen, "led_color=%s", clean);
+    return true;
+  }
+  if (!strcmp(key, "led_brightness")) {
+    leds_set_brightness(atoi(val));
+    snprintf(reply, replyLen, "led_brightness=%s", val);
+    return true;
+  }
+  if (!strcmp(key, "brightness")) {
+    screenBrightness = constrain(atoi(val), 10, 100);
+    display_set_brightness(screenBrightness);
+    snprintf(reply, replyLen, "brightness=%d", screenBrightness);
+    return true;
+  }
+  if (!strcmp(key, "play")) {
+    ble_media_play_pause();
+    snprintf(reply, replyLen, "play");
+    return true;
+  }
+  if (!strcmp(key, "next")) {
+    ble_media_next();
+    snprintf(reply, replyLen, "next");
+    return true;
+  }
+  if (!strcmp(key, "prev")) {
+    ble_media_prev();
+    snprintf(reply, replyLen, "prev");
+    return true;
+  }
+  if (!strcmp(key, "gyro_reset")) {
+    sensors_auto_calibrate_gyro();
+    snprintf(reply, replyLen, "gyro recalibrated");
+    return true;
+  }
+  if (!strcmp(key, "calibrate")) {
+    calibrationMode = true;
+    calibration_start();
+    snprintf(reply, replyLen, "calibration started (30s)");
+    return true;
+  }
+  if (!strcmp(key, "reboot")) {
+    snprintf(reply, replyLen, "rebooting");
+    Serial.println("[CMD] Reboot requested");
+    // Deferred so the BLE/HTTP reply actually reaches the phone first.
+    static bool rebootPending = false;
+    if (!rebootPending) {
+      rebootPending = true;
+      // main loop's delay(5) gives this ~5ms of margin; that's enough for the
+      // BLE stack to flush the notification before restart.
+      delay(150);
+      ESP.restart();
+    }
     return true;
   }
 

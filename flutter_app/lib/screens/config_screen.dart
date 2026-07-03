@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/device_service.dart';
@@ -18,6 +19,17 @@ class _ConfigScreenState extends State<ConfigScreen> {
   bool _wifiConnecting = false;
   String? _wifiError;
   bool _wifiConnected = false;
+  String _appVersion = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // Read the real installed version so this screen can never drift out of
+    // sync with what's actually shipped (was previously a hardcoded string).
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() => _appVersion = 'v${info.version} (${info.buildNumber})');
+    });
+  }
 
   @override
   void dispose() {
@@ -130,7 +142,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
         children: [
           Text('Star Trail Cluster Controller', style: TextStyle(color: theme.textPrimary, fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
           SizedBox(height: 4),
-          Text('v1.0.0', style: TextStyle(color: theme.textMuted, fontSize: 11, letterSpacing: 0.5)),
+          Text(_appVersion.isEmpty ? ' ' : _appVersion, style: TextStyle(color: theme.textMuted, fontSize: 11, letterSpacing: 0.5)),
           SizedBox(height: 10),
           Text(
             'Premium telemetry dashboard for your Star Trail cluster. Monitor altitude, heading, temperature, and vehicle dynamics in real-time.',
