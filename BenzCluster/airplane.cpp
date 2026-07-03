@@ -38,7 +38,7 @@ static float prevPitch = 0, prevRoll = 0, prevHdg = 0;
 
 void airplane_init() {
   airplaneScreen = lv_obj_create(NULL);
-  lv_obj_set_style_bg_color(airplaneScreen, lv_color_hex(0x0A121C), 0);
+  lv_obj_set_style_bg_color(airplaneScreen, lv_color_hex(0x000000), 0);
   lv_obj_clear_flag(airplaneScreen, LV_OBJ_FLAG_SCROLLABLE);
 
   // === Bezel rings ===
@@ -46,8 +46,8 @@ void airplane_init() {
   lv_obj_set_size(outerRing, 230, 230);
   lv_obj_align(outerRing, LV_ALIGN_CENTER, 0, 0);
   lv_obj_set_style_radius(outerRing, 115, 0);
-  lv_obj_set_style_bg_color(outerRing, lv_color_hex(0xAAAAAA), 0);
-  lv_obj_set_style_border_color(outerRing, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_set_style_bg_color(outerRing, lv_color_hex(0x1A1A1A), 0);
+  lv_obj_set_style_border_color(outerRing, lv_color_hex(0x333333), 0);
   lv_obj_set_style_border_width(outerRing, 1, 0);
   lv_obj_clear_flag(outerRing, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -55,7 +55,7 @@ void airplane_init() {
   lv_obj_set_size(innerRing, 218, 218);
   lv_obj_align(innerRing, LV_ALIGN_CENTER, 0, 0);
   lv_obj_set_style_radius(innerRing, 109, 0);
-  lv_obj_set_style_bg_color(innerRing, lv_color_hex(0x0A121C), 0);
+  lv_obj_set_style_bg_color(innerRing, lv_color_hex(0x000000), 0);
   lv_obj_set_style_border_color(innerRing, lv_color_hex(0x0F0F0F), 0);
   lv_obj_set_style_border_width(innerRing, 1, 0);
   lv_obj_clear_flag(innerRing, LV_OBJ_FLAG_SCROLLABLE);
@@ -197,19 +197,19 @@ void airplane_init() {
   pitchLabel = lv_label_create(airplaneScreen);
   lv_label_set_text(pitchLabel, "P +0\xC2\xB0");
   lv_obj_set_style_text_font(pitchLabel, &lv_font_montserrat_10, 0);
-  lv_obj_set_style_text_color(pitchLabel, lv_color_hex(0x00FFAA), 0);
+  lv_obj_set_style_text_color(pitchLabel, lv_color_hex(0x999999), 0);
   lv_obj_align(pitchLabel, LV_ALIGN_BOTTOM_LEFT, 10, -10);
 
   rollLabel = lv_label_create(airplaneScreen);
   lv_label_set_text(rollLabel, "R +0\xC2\xB0");
   lv_obj_set_style_text_font(rollLabel, &lv_font_montserrat_10, 0);
-  lv_obj_set_style_text_color(rollLabel, lv_color_hex(0x00FFAA), 0);
+  lv_obj_set_style_text_color(rollLabel, lv_color_hex(0x999999), 0);
   lv_obj_align(rollLabel, LV_ALIGN_BOTTOM_RIGHT, -10, -10);
 
   hdgLabel = lv_label_create(airplaneScreen);
   lv_label_set_text(hdgLabel, "HDG 000\xC2\xB0");
   lv_obj_set_style_text_font(hdgLabel, &lv_font_montserrat_10, 0);
-  lv_obj_set_style_text_color(hdgLabel, lv_color_hex(0x88CCFF), 0);
+  lv_obj_set_style_text_color(hdgLabel, lv_color_hex(0xFFFFFF), 0);
   lv_obj_align(hdgLabel, LV_ALIGN_TOP_MID, 0, 10);
 }
 

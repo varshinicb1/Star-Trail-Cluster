@@ -70,6 +70,76 @@ static lv_obj_t *rollValLabel = NULL;
 #define PPD 3
 
 static float prevPitch = -999, prevRoll = -999;
+static uint8_t attStyle = ATT_STYLE_CLASSIC;
+
+static void setHidden(lv_obj_t *o, bool hide) {
+  if (!o) return;
+  if (hide) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+  else lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN);
+}
+
+// Re-skin the shared object tree for the active style. Called on init and on
+// every style change; cheap (visibility + colour only, no realloc).
+static void applyStyle() {
+  bool classic = (attStyle == ATT_STYLE_CLASSIC);
+  bool fullscreen = (attStyle == ATT_STYLE_FULLSCREEN);
+  bool minimal = (attStyle == ATT_STYLE_MINIMAL);
+  bool tape = (attStyle == ATT_STYLE_TAPE);
+
+  // Sky/ground fills: classic + fullscreen only.
+  setHidden(skyRect, minimal || tape);
+  setHidden(gndRect, minimal || tape);
+
+  // Runway: classic only (it's the signature classic flourish).
+  setHidden(runwayObj, !classic);
+  setHidden(rwyEdge1, !classic);
+  setHidden(rwyEdge2, !classic);
+  setHidden(rwyEdge3, !classic);
+
+  // Bank arc + ticks + pointers: hidden in fullscreen (clean horizon).
+  setHidden(bankArc, fullscreen);
+  for (int i = 0; i < NUM_BANK_TICKS; i++) setHidden(bankTicks[i], fullscreen);
+  setHidden(skyPtr, fullscreen);
+  setHidden(rollPtr, fullscreen);
+
+  // Pitch ladder: hidden in fullscreen; visible elsewhere.
+  for (int i = 0; i < NUM_PITCH_MARKS; i++) {
+    setHidden(pLines[i], fullscreen);
+    setHidden(pLabelsL[i], fullscreen);
+    setHidden(pLabelsR[i], fullscreen);
+  }
+
+  // Aircraft symbol colour: yellow for classic/fullscreen, white for the
+  // monochrome styles.
+  lv_color_t acCol = (minimal || tape) ? lv_color_white() : lv_color_hex(0xFFDD00);
+  if (acLeft) lv_obj_set_style_bg_color(acLeft, acCol, 0);
+  if (acRight) lv_obj_set_style_bg_color(acRight, acCol, 0);
+  if (acCenter) lv_obj_set_style_line_color(acCenter, acCol, 0);
+  if (rollPtr)
+    lv_obj_set_style_line_color(rollPtr, (minimal || tape) ? lv_color_white()
+                                                           : lv_color_hex(0xFFDD00), 0);
+
+  // HUD value colour: green accent on colour styles, muted grey on mono.
+  lv_color_t hudCol = (minimal || tape) ? lv_color_hex(0x999999) : lv_color_hex(0x00FFAA);
+  if (pitchValLabel) lv_obj_set_style_text_color(pitchValLabel, hudCol, 0);
+  if (rollValLabel) lv_obj_set_style_text_color(rollValLabel, hudCol, 0);
+}
+
+void attitude_set_style(uint8_t style) {
+  if (style >= ATT_STYLE_COUNT) style = ATT_STYLE_CLASSIC;
+  attStyle = style;
+  if (attitudeScreen) {
+    applyStyle();
+    // Re-render immediately with the last known attitude.
+    if (prevPitch > -900) {
+      float p = prevPitch, r = prevRoll;
+      prevPitch = -999;  // force full redraw path
+      attitude_update(p, r);
+    }
+  }
+}
+
+uint8_t attitude_get_style() { return attStyle; }
 
 void attitude_init() {
   attitudeScreen = lv_obj_create(NULL);
@@ -251,6 +321,8 @@ void attitude_init() {
   lv_obj_set_style_text_font(rollValLabel, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(rollValLabel, lv_color_hex(0x00FFAA), 0);
   lv_obj_align(rollValLabel, LV_ALIGN_BOTTOM_RIGHT, -15, -10);
+
+  applyStyle();
 }
 
 void attitude_update(float pitch, float roll) {
@@ -280,10 +352,11 @@ void attitude_update(float pitch, float roll) {
   lv_obj_set_pos(gndRect, -20, CY + pitchPx);
   lv_obj_set_pos(horizLine, -20, CY + pitchPx - 1);
 
-  // Pitch ladder (rotates with roll)
+  // Pitch ladder (rotates with roll; EFIS tape style keeps it vertical and
+  // shows roll only on the top scale, per glass-cockpit convention)
   float rRad = r * M_PI / 180.0f;
-  float cosR = cosf(rRad);
-  float sinR = sinf(rRad);
+  float cosR = (attStyle == ATT_STYLE_TAPE) ? 1.0f : cosf(rRad);
+  float sinR = (attStyle == ATT_STYLE_TAPE) ? 0.0f : sinf(rRad);
 
   for (int i = 0; i < NUM_PITCH_MARKS; i++) {
     int deg = pitchDegs[i];

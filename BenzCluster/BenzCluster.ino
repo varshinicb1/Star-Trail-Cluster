@@ -30,6 +30,7 @@
 #include "ble_notify.h"
 #include "calibration.h"
 #include "clock.h"
+#include "commands.h"
 #include "compass.h"
 #include "config.h"
 #include "custom_screen.h"
@@ -168,6 +169,7 @@ void setup() {
   sensorview_init();
   systemview_init();
   custom_screen_init();
+  cluster_load_attitude_style();
 
   // Restore last widget from SPIFFS
   int savedWidget = 0;
@@ -229,6 +231,19 @@ void loop() {
   if (toastObj && toastShowTime > 0 && millis() - toastShowTime > 4000) {
     lv_obj_add_flag(toastObj, LV_OBJ_FLAG_HIDDEN);
     toastShowTime = 0;
+  }
+
+  // === Device command received over BLE ("cmd:" writes) ===
+  {
+    char cmd[64], reply[128];
+    if (ble_command_take(cmd, sizeof(cmd))) {
+      if (cluster_handle_command(cmd, reply, sizeof(reply))) {
+        if (reply[0]) ble_data_notify(reply);
+        showToast(reply[0] ? reply : cmd);
+      } else {
+        Serial.printf("[CMD] Unknown: %s\n", cmd);
+      }
+    }
   }
 
   // === Custom widget layout pushed over BLE ===

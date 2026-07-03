@@ -5,6 +5,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
+#include "commands.h"
 #include "custom_screen.h"
 #include "custom_widget.h"
 
@@ -419,6 +420,18 @@ void ota_init() {
     screenBrightness = constrain(v, 10, 100);
     display_set_brightness(screenBrightness);
     webServer->send(200, "text/plain", "OK");
+  });
+
+  // Generic device command (mirrors the BLE "cmd:" channel):
+  //   GET /api/cmd?c=attitude_style=2   etc.
+  webServer->on("/api/cmd", HTTP_GET, []() {
+    String c = webServer->arg("c");
+    char reply[128];
+    if (c.length() > 0 && cluster_handle_command(c.c_str(), reply, sizeof(reply))) {
+      webServer->send(200, "text/plain", reply[0] ? reply : "OK");
+    } else {
+      webServer->send(400, "text/plain", "Unknown command");
+    }
   });
 
   // Custom widget layout push (WiFi fallback for the app designer).

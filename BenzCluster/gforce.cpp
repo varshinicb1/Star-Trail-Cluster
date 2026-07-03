@@ -32,14 +32,14 @@ static float peakLonG = 0;
 
 void gforce_init() {
   gforceScreen = lv_obj_create(NULL);
-  lv_obj_set_style_bg_color(gforceScreen, lv_color_hex(0x0A0A0A), 0);
+  lv_obj_set_style_bg_color(gforceScreen, lv_color_hex(0x000000), 0);
   lv_obj_clear_flag(gforceScreen, LV_OBJ_FLAG_SCROLLABLE);
 
   // Title
   lv_obj_t *title = lv_label_create(gforceScreen);
   lv_label_set_text(title, "G-FORCE");
   lv_obj_set_style_text_font(title, &lv_font_montserrat_10, 0);
-  lv_obj_set_style_text_color(title, lv_color_hex(0x44FF44), 0);
+  lv_obj_set_style_text_color(title, lv_color_hex(0x777777), 0);
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 25);
 
   // G-circle rings: 0.25g, 0.5g, 0.75g, 1.0g
@@ -85,7 +85,7 @@ void gforce_init() {
   peakDotF = lv_obj_create(gforceScreen);
   lv_obj_set_size(peakDotF, 4, 4);
   lv_obj_align(peakDotF, LV_ALIGN_CENTER, 0, 5);
-  lv_obj_set_style_bg_color(peakDotF, lv_color_hex(0xFF4444), 0);
+  lv_obj_set_style_bg_color(peakDotF, lv_color_hex(0xE01020), 0);
   lv_obj_set_style_bg_opa(peakDotF, LV_OPA_50, 0);
   lv_obj_set_style_border_width(peakDotF, 0, 0);
   lv_obj_set_style_radius(peakDotF, 2, 0);
@@ -95,10 +95,10 @@ void gforce_init() {
   gDot = lv_obj_create(gforceScreen);
   lv_obj_set_size(gDot, DOT_R * 2, DOT_R * 2);
   lv_obj_align(gDot, LV_ALIGN_CENTER, 0, 5);
-  lv_obj_set_style_bg_color(gDot, lv_color_hex(0x00FF66), 0);
+  lv_obj_set_style_bg_color(gDot, lv_color_hex(0xFFFFFF), 0);
   lv_obj_set_style_border_width(gDot, 0, 0);
   lv_obj_set_style_radius(gDot, DOT_R, 0);
-  lv_obj_set_style_shadow_color(gDot, lv_color_hex(0x00FF66), 0);
+  lv_obj_set_style_shadow_color(gDot, lv_color_hex(0xFFFFFF), 0);
   lv_obj_set_style_shadow_width(gDot, 8, 0);
   lv_obj_set_style_shadow_spread(gDot, 2, 0);
 
@@ -106,19 +106,19 @@ void gforce_init() {
   latLabel = lv_label_create(gforceScreen);
   lv_label_set_text(latLabel, "LAT 0.00g");
   lv_obj_set_style_text_font(latLabel, &lv_font_montserrat_10, 0);
-  lv_obj_set_style_text_color(latLabel, lv_color_hex(0xAABBCC), 0);
+  lv_obj_set_style_text_color(latLabel, lv_color_hex(0xAAAAAA), 0);
   lv_obj_align(latLabel, LV_ALIGN_CENTER, -40, 95);
 
   lonLabel = lv_label_create(gforceScreen);
   lv_label_set_text(lonLabel, "LON 0.00g");
   lv_obj_set_style_text_font(lonLabel, &lv_font_montserrat_10, 0);
-  lv_obj_set_style_text_color(lonLabel, lv_color_hex(0xAABBCC), 0);
+  lv_obj_set_style_text_color(lonLabel, lv_color_hex(0xAAAAAA), 0);
   lv_obj_align(lonLabel, LV_ALIGN_CENTER, 40, 95);
 
   peakLabel = lv_label_create(gforceScreen);
   lv_label_set_text(peakLabel, "PEAK 0.00g");
   lv_obj_set_style_text_font(peakLabel, &lv_font_montserrat_10, 0);
-  lv_obj_set_style_text_color(peakLabel, lv_color_hex(0xFF6644), 0);
+  lv_obj_set_style_text_color(peakLabel, lv_color_hex(0xE01020), 0);
   lv_obj_align(peakLabel, LV_ALIGN_CENTER, 0, 108);
 }
 

@@ -16,7 +16,7 @@ static bool isPlaying = false;
 
 void music_init() {
   musicScreen = lv_obj_create(NULL);
-  lv_obj_set_style_bg_color(musicScreen, lv_color_hex(0x0A0A0A), 0);
+  lv_obj_set_style_bg_color(musicScreen, lv_color_hex(0x000000), 0);
   lv_obj_clear_flag(musicScreen, LV_OBJ_FLAG_SCROLLABLE);
 
   // ===== Volume Arc (outer ring) =====
@@ -38,7 +38,7 @@ void music_init() {
   statusLabel = lv_label_create(musicScreen);
   lv_label_set_text(statusLabel, LV_SYMBOL_BLUETOOTH " Star Trail");
   lv_obj_set_style_text_font(statusLabel, &lv_font_montserrat_10, 0);
-  lv_obj_set_style_text_color(statusLabel, lv_color_hex(0xFF4444), 0);
+  lv_obj_set_style_text_color(statusLabel, lv_color_hex(0x777777), 0);
   lv_obj_align(statusLabel, LV_ALIGN_TOP_MID, 0, 30);
 
   // Play/pause icon - large centered (persistent for toggling)
@@ -128,10 +128,10 @@ void music_update() {
   if (connected != lastConnected) {
     if (connected) {
       lv_label_set_text(statusLabel, LV_SYMBOL_BLUETOOTH " Connected");
-      lv_obj_set_style_text_color(statusLabel, lv_color_hex(0x44FF44), 0);
+      lv_obj_set_style_text_color(statusLabel, lv_color_hex(0xFFFFFF), 0);
     } else {
       lv_label_set_text(statusLabel, LV_SYMBOL_BLUETOOTH " Star Trail");
-      lv_obj_set_style_text_color(statusLabel, lv_color_hex(0xFF4444), 0);
+      lv_obj_set_style_text_color(statusLabel, lv_color_hex(0x777777), 0);
     }
     lv_obj_align(statusLabel, LV_ALIGN_TOP_MID, 0, 30);
     lastConnected = connected;
