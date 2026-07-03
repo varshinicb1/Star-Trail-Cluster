@@ -1,8 +1,11 @@
-# Star Trail Firmware v9.0
+# Star Trail Firmware v2.0
 
 ## Overview
 ESP32-S3 automotive instrument cluster firmware with LVGL display.  
-240×240 round LCD | MPU9250 IMU | BME280 | BLE | WiFi | OTA
+240×240 round LCD | MPU6050 + QMC5883L | BME280 | BLE | WiFi | OTA
+
+Black, minimalist, car-dashboard design language: pure-black backgrounds,
+white primary content, single red accent (`#E01020`).
 
 ## Widget Preview
 Rendered from the actual firmware widget code via the LVGL PC simulator
@@ -12,10 +15,36 @@ Rendered from the actual firmware widget code via the LVGL PC simulator
 
 | | | | |
 |:-:|:-:|:-:|:-:|
-| ![Clock](docs/widgets/clock.png) | ![Compass](docs/widgets/compass.png) | ![Attitude](docs/widgets/attitude.png) | ![Alt/Temp](docs/widgets/alttemp.png) |
-| Clock | Compass | Attitude | Alt / Temp |
-| ![G-Force](docs/widgets/gforce.png) | ![Music](docs/widgets/music.png) | ![Airplane](docs/widgets/airplane.png) | |
-| G-Force | Music | Airplane | |
+| ![Compass](docs/widgets/compass.png) | ![Alt/Temp](docs/widgets/alttemp.png) | ![Attitude Classic](docs/widgets/attitude.png) | ![Attitude Fullscreen](docs/widgets/attitude_style1.png) |
+| Compass (linear) | Alt / Temp | Attitude — Classic | Attitude — Fullscreen |
+| ![Attitude Minimal](docs/widgets/attitude_style2.png) | ![Attitude Tape](docs/widgets/attitude_style3.png) | ![Clock](docs/widgets/clock.png) | ![G-Force](docs/widgets/gforce.png) |
+| Attitude — Minimal | Attitude — Tape/EFIS | Clock | G-Force |
+| ![Music](docs/widgets/music.png) | ![Airplane](docs/widgets/airplane.png) | | |
+| Music | Airplane | | |
+
+### Attitude styles (selectable from the app, like a watch face)
+`attitude_style=N` — 0 Classic ICAO (default), 1 Fullscreen horizon,
+2 Minimal line, 3 Tape/EFIS. Persisted across reboots.
+
+### Device command API (BLE + HTTP, identical behaviour)
+- BLE: write `cmd:<command>` to the notify characteristic; reply arrives on the
+  data-notify characteristic.
+- HTTP: `GET /api/cmd?c=<command>`
+
+| Command | Effect |
+|---------|--------|
+| `attitude_style=N` | Select attitude style 0–3 (persisted) |
+| `factory_zero` | Capture mount-tilt orientation zero (car on level ground) |
+| `factory_magcal=S` | Figure-8 magnetometer calibration for S seconds |
+| `declination=F` | Magnetic declination in degrees (true-north heading) |
+| `debug_sensors` | Returns raw + fused sensor values |
+
+### Sensors & heading pipeline
+MPU6050 complementary pitch/roll fusion + QMC5883L tilt-compensated heading
+(hard/soft-iron corrected, declination applied → **true north**), wrap-aware
+smoothing. A one-time **factory calibration** (orientation zero + figure-8)
+stores the 25–30° enclosure mount tilt so shipped units are correct out of the
+box — end customers never calibrate.
 
 ### Running the simulator yourself
 The same widget code compiles and runs on a PC via SDL2 + LVGL (no hardware

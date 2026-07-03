@@ -17,4 +17,9 @@ void ble_data_notify(const char *json);
 // transfer; the caller then parses/saves/reloads.
 bool ble_custom_layout_take(String &out);
 
+// Device command received over BLE ("cmd:<command>" writes on the notify
+// characteristic). Returns true once per queued command; execute it via
+// cluster_handle_command() from the main loop.
+bool ble_command_take(char *out, int maxLen);
+
 #endif

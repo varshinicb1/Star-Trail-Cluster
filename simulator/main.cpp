@@ -149,6 +149,23 @@ static void run_screenshots(const char *dir) {
     char path[512];
     snprintf(path, sizeof(path), "%s/%s.bmp", dir, s.name);
     save_bmp(path);
+
+    // Capture the three alternate attitude styles too.
+    if (s.idx == 2) {
+      for (uint8_t st = 1; st <= 3; st++) {
+        attitude_set_style(st);
+        for (int i = 0; i < 20; i++) {
+          attitude_update(10.0f, -15.0f);
+          lv_tick_inc(16);
+          lv_timer_handler();
+        }
+        lv_obj_invalidate(lv_scr_act());
+        for (int i = 0; i < 3; i++) { lv_tick_inc(16); lv_timer_handler(); }
+        snprintf(path, sizeof(path), "%s/attitude_style%d.bmp", dir, st);
+        save_bmp(path);
+      }
+      attitude_set_style(0);
+    }
   }
 }
 

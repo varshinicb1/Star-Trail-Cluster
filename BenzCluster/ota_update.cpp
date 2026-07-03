@@ -5,6 +5,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
+#include "commands.h"
 #include "custom_screen.h"
 #include "custom_widget.h"
 
@@ -372,16 +373,12 @@ void ota_init() {
     webServer->send(200, "text/plain", "OK");
   });
 
-  // App version info (for Flutter auto-update)
+  // App version info. The app's own UpdateService queries the GitHub Releases
+  // API directly (see flutter_app/lib/services/update_service.dart), so this
+  // endpoint is a secondary/offline-friendly mirror — keep the repo in sync.
   webServer->on("/api/app-version", HTTP_GET, []() {
     webServer->send(200, "application/json",
-      "{\"latest_version\":\"1.0.1\",\"latest_build\":2,"
-      "\"apk_url\":\"https://github.com/edgehax/star_trail/releases/latest\","
-      "\"changelog\":\"Real firmware OTA upload via file picker. "
-      "App auto-update via GitHub Releases. "
-      "Premium glassmorphism UI. "
-      "Fixed BLE command routing. "
-      "Added widget and system config screens.\"}");
+      "{\"github_repo\":\"varshinicb1/Star-Trail-Cluster\"}");
   });
 
   // Widget config
@@ -419,6 +416,18 @@ void ota_init() {
     screenBrightness = constrain(v, 10, 100);
     display_set_brightness(screenBrightness);
     webServer->send(200, "text/plain", "OK");
+  });
+
+  // Generic device command (mirrors the BLE "cmd:" channel):
+  //   GET /api/cmd?c=attitude_style=2   etc.
+  webServer->on("/api/cmd", HTTP_GET, []() {
+    String c = webServer->arg("c");
+    char reply[128];
+    if (c.length() > 0 && cluster_handle_command(c.c_str(), reply, sizeof(reply))) {
+      webServer->send(200, "text/plain", reply[0] ? reply : "OK");
+    } else {
+      webServer->send(400, "text/plain", "Unknown command");
+    }
   });
 
   // Custom widget layout push (WiFi fallback for the app designer).

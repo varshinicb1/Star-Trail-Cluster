@@ -72,6 +72,42 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
       vsync: this,
       duration: Duration(milliseconds: 400),
     );
+    // Auto-update: check GitHub releases once on launch and offer the update.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoCheckUpdate());
+  }
+
+  Future<void> _autoCheckUpdate() async {
+    final us = context.read<UpdateService>();
+    final info = await us.checkForUpdate();
+    if (!mounted || info == null || !us.updateAvailable) return;
+    final theme = context.read<ThemeProvider>().theme;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.card,
+        title: Text('Update available',
+            style: TextStyle(color: theme.textPrimary, fontSize: 17)),
+        content: Text(
+          'Star Trail ${info.version} is ready to install.',
+          style: TextStyle(color: theme.textSecondary, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Later', style: TextStyle(color: theme.textMuted)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final path = await us.downloadApk();
+              if (path != null) await us.installApk(path);
+            },
+            child: Text('Update now',
+                style: TextStyle(color: theme.primary, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -87,6 +123,11 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
     return Scaffold(
       body: PageView(
         controller: _pageController,
+        // Lock swipe on the Designer tab: its drag gestures move elements on
+        // the canvas and must never pan the PageView underneath.
+        physics: _page == 1
+            ? const NeverScrollableScrollPhysics()
+            : const PageScrollPhysics(),
         onPageChanged: (i) {
           setState(() => _page = i);
           _navAnimController.forward(from: 0);

@@ -16,6 +16,9 @@ enum PushResult { ok, okViaWifi, failed, notConnected }
 const String kLayoutServiceUuid = '00002222-3333-4444-5555-666677778888';
 const String kLayoutCharUuid = '00002222-3333-4444-5555-666677778889';
 
+// Device-command characteristic ("cmd:" writes; must match ble_notify.cpp).
+const String kNotifyCharUuid = 'deadbeef-cafe-1234-5678-abcdef012346';
+
 class DeviceService extends ChangeNotifier {
   DeviceData _data = DeviceData();
   DeviceData get data => _data;
@@ -61,11 +64,16 @@ class DeviceService extends ChangeNotifier {
       var services = await _bleDevice!.discoverServices();
       for (var svc in services) {
         for (var chr in svc.characteristics) {
-          // Layout push characteristic (write) — capture by its specific UUID.
-          if (chr.uuid.toString().toLowerCase() == kLayoutCharUuid) {
+          final uuid = chr.uuid.toString().toLowerCase();
+          // Match every BLE characteristic by its specific UUID — NOT by
+          // "first/last writable characteristic found", which previously let
+          // the layout-push characteristic silently steal the command slot
+          // (or vice versa) depending on GATT discovery order.
+          if (uuid == kLayoutCharUuid) {
             _layoutChar = chr;
-          }
-          if (chr.properties.notify && _dataChar == null) {
+          } else if (uuid == kNotifyCharUuid) {
+            _cmdChar = chr;
+          } else if (chr.properties.notify && _dataChar == null) {
             _dataChar = chr;
             await chr.setNotifyValue(true);
             chr.onValueReceived.listen((val) {
@@ -73,9 +81,6 @@ class DeviceService extends ChangeNotifier {
               var parsed = jsonDecode(json);
               _updateFromJson(parsed);
             });
-          }
-          if (chr.properties.write || chr.properties.writeWithoutResponse) {
-            _cmdChar = chr;
           }
         }
       }
@@ -267,12 +272,59 @@ class DeviceService extends ChangeNotifier {
     }
     if (mode == ConnectionMode.ble && _cmdChar != null) {
       try {
-        await _cmdChar!.write(utf8.encode(command));
+        // Firmware's BLE notify handler only routes "cmd:"-prefixed writes to
+        // the command dispatcher (commands.cpp); anything else is treated as
+        // a toast-message string and silently ignored. Every control command
+        // (LED, brightness, music, reboot, etc.) MUST be prefixed to work.
+        await _cmdChar!.write(utf8.encode('cmd:$command'), withoutResponse: false);
         return true;
       } catch (_) {
         return false;
       }
     }
     return false;
+  }
+
+  /// Send a raw device command and, if connected via BLE, wait briefly for a
+  /// reply on the data-notify characteristic (firmware echoes short replies
+  /// there for commands like `debug_sensors`, `attitude_style=N`, etc.).
+  /// Falls back to null on WiFi (the HTTP response body is the reply there —
+  /// callers that need the WiFi reply should call [sendCommandWithReply]).
+  Future<String?> sendCommandWithReply(String command,
+      {Duration timeout = const Duration(seconds: 3)}) async {
+    if (mode == ConnectionMode.wifi && _wifiHost != null) {
+      try {
+        final path = routeCommand(command);
+        final resp = await http
+            .get(Uri.parse('http://$_wifiHost$path'))
+            .timeout(timeout);
+        return resp.statusCode == 200 ? resp.body : null;
+      } catch (_) {
+        return null;
+      }
+    }
+    if (mode == ConnectionMode.ble && _cmdChar != null && _dataChar != null) {
+      try {
+        final completer = Completer<String?>();
+        // The data characteristic also carries the periodic sensor-JSON
+        // notify (every 500ms), which races with our reply on the same
+        // channel. Sensor payloads always start with '{'; command replies
+        // are always plain text — filter on that to avoid grabbing the
+        // wrong notification.
+        final sub = _dataChar!.onValueReceived.listen((val) {
+          final text = utf8.decode(val);
+          if (!completer.isCompleted && !text.startsWith('{')) {
+            completer.complete(text);
+          }
+        });
+        await _cmdChar!.write(utf8.encode('cmd:$command'), withoutResponse: false);
+        final result = await completer.future.timeout(timeout, onTimeout: () => null);
+        await sub.cancel();
+        return result;
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
   }
 }

@@ -57,18 +57,37 @@ class LayoutCallbacks : public NimBLECharacteristicCallbacks {
   }
 };
 
+// Pending device command received over BLE ("cmd:" prefix). Executed from the
+// main loop (NOT the BLE task) because some commands block for seconds.
+static char pendingCmd[64] = {0};
+static bool hasPendingCmd = false;
+
 // Callback for receiving notifications from phone
 class NotifyCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic *pChar, NimBLEConnInfo &connInfo) override {
     std::string val = pChar->getValue();
-    if (val.length() > 0) {
-      strncpy(lastMessage, val.c_str(), sizeof(lastMessage) - 1);
-      lastMessage[sizeof(lastMessage) - 1] = '\0';
-      hasNewMessage = true;
-      Serial.printf("[BLE-N] Received: %s\n", lastMessage);
+    if (val.length() == 0) return;
+    if (val.rfind("cmd:", 0) == 0) {
+      strncpy(pendingCmd, val.c_str() + 4, sizeof(pendingCmd) - 1);
+      pendingCmd[sizeof(pendingCmd) - 1] = '\0';
+      hasPendingCmd = true;
+      Serial.printf("[BLE-N] Command queued: %s\n", pendingCmd);
+      return;
     }
+    strncpy(lastMessage, val.c_str(), sizeof(lastMessage) - 1);
+    lastMessage[sizeof(lastMessage) - 1] = '\0';
+    hasNewMessage = true;
+    Serial.printf("[BLE-N] Received: %s\n", lastMessage);
   }
 };
+
+bool ble_command_take(char *out, int maxLen) {
+  if (!hasPendingCmd) return false;
+  strncpy(out, pendingCmd, maxLen - 1);
+  out[maxLen - 1] = '\0';
+  hasPendingCmd = false;
+  return true;
+}
 
 class BatteryCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic *pChar, NimBLEConnInfo &connInfo) override {
