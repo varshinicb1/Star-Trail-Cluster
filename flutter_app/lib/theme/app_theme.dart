@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-enum AppThemeMode { benz, starTrail, illuminati }
+enum AppThemeMode { starTrail, illuminati }
 
 class AppTheme {
   final String name;
@@ -182,25 +182,28 @@ class AppTheme {
     ),
   );
 
+  // Premium black / gunmetal / brushed-chrome — the flagship automotive theme,
+  // paired with the real Mercedes emblem (see ThemeLogo). Formerly split
+  // across two overlapping "Benz" and "Star Trail" themes; merged into one.
   static const starTrail = AppTheme(
     name: 'Star Trail',
-    welcomeSubtitle: 'Star Trail • Mercedes',
-    primary: Color(0xFF00CCFF),
-    secondary: Color(0xFF0088CC),
-    accent: Color(0xFF00FF88),
-    surface: Color(0xFF080810),
-    surfaceLight: Color(0xFF0D0D1A),
-    card: Color(0xFF111122),
-    cardBorder: Color(0xFF1A1A33),
-    textPrimary: Color(0xFFEEEEFF),
-    textSecondary: Color(0xFF9999BB),
-    textMuted: Color(0xFF555577),
-    success: Color(0xFF00FF88),
-    warning: Color(0xFFFFAA00),
-    error: Color(0xFFFF4444),
-    gradientStart: Color(0xFF00CCFF),
-    gradientEnd: Color(0xFF0066AA),
-    glow: Color(0xFF00CCFF),
+    welcomeSubtitle: 'Star Trail • Premium Cluster',
+    primary: Color(0xFFC8C9CC),       // brushed chrome / steel silver
+    secondary: Color(0xFF8E9195),     // gunmetal
+    accent: Color(0xFF6FA8C7),        // cool steel-blue highlight
+    surface: Color(0xFF0A0A0C),       // near-black cockpit
+    surfaceLight: Color(0xFF121216),  // raised panel
+    card: Color(0xFF17171B),          // gunmetal card
+    cardBorder: Color(0xFF2A2A30),    // subtle metal edge
+    textPrimary: Color(0xFFF2F3F5),   // polished white
+    textSecondary: Color(0xFFA9ABB0), // silver text
+    textMuted: Color(0xFF6A6C72),     // muted steel
+    success: Color(0xFF7FD1A6),       // restrained mint
+    warning: Color(0xFFE0B15A),       // amber
+    error: Color(0xFFD46A6A),         // muted red
+    gradientStart: Color(0xFF1D1D22), // dark metallic (full-screen bg top)
+    gradientEnd: Color(0xFF050506),   // near-black (full-screen bg bottom)
+    glow: Color(0xFF8FB4CC),          // faint steel-blue glow
     brightness: Brightness.dark,
   );
 
@@ -226,34 +229,10 @@ class AppTheme {
     brightness: Brightness.dark,
   );
 
-  // Premium black / gunmetal / brushed-chrome — the flagship automotive theme.
-  static const benz = AppTheme(
-    name: 'Benz',
-    welcomeSubtitle: 'Star Trail • Premium Cluster',
-    primary: Color(0xFFC8C9CC),       // brushed chrome / steel silver
-    secondary: Color(0xFF8E9195),     // gunmetal
-    accent: Color(0xFF6FA8C7),        // cool steel-blue highlight
-    surface: Color(0xFF0A0A0C),       // near-black cockpit
-    surfaceLight: Color(0xFF121216),  // raised panel
-    card: Color(0xFF17171B),          // gunmetal card
-    cardBorder: Color(0xFF2A2A30),    // subtle metal edge
-    textPrimary: Color(0xFFF2F3F5),   // polished white
-    textSecondary: Color(0xFFA9ABB0), // silver text
-    textMuted: Color(0xFF6A6C72),     // muted steel
-    success: Color(0xFF7FD1A6),       // restrained mint
-    warning: Color(0xFFE0B15A),       // amber
-    error: Color(0xFFD46A6A),         // muted red
-    gradientStart: Color(0xFF1D1D22), // dark metallic (full-screen bg top)
-    gradientEnd: Color(0xFF050506),   // near-black (full-screen bg bottom)
-    glow: Color(0xFF8FB4CC),          // faint steel-blue glow
-    brightness: Brightness.dark,
-  );
-
-  static const themes = [benz, starTrail, illuminati];
+  static const themes = [starTrail, illuminati];
 
   static AppTheme fromMode(AppThemeMode mode) {
     switch (mode) {
-      case AppThemeMode.benz: return benz;
       case AppThemeMode.starTrail: return starTrail;
       case AppThemeMode.illuminati: return illuminati;
     }
