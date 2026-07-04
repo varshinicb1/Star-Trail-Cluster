@@ -46,11 +46,10 @@
 #define LOCAL_ELEVATION_FEET 3018.0f
 
 // ============== WiFi Config ==============
-#define WIFI_SSID "V"
-#define WIFI_PASSWORD "varshu99"
+// Real credentials live in secrets.h (gitignored, not committed). Copy
+// secrets.h.example to secrets.h and fill in your own values.
+#include "secrets.h"
 
-// OpenWeatherMap API for sea-level pressure
-#define WEATHER_API_KEY "" // Optional: Add your API key
 #define WEATHER_LAT "12.9716"
 #define WEATHER_LON "77.5946"
 

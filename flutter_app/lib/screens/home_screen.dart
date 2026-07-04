@@ -253,44 +253,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  // Mirrors the device's actual linear-scrolling compass widget
+  // (BenzCluster/compass.cpp) exactly: pure-black background, a horizontal
+  // white scale that scrolls under a FIXED RED centre needle, with the
+  // heading value in white text below. This is deliberately NOT a rotating
+  // dial — the app must show the same design the gadget shows, not a
+  // decorative reinterpretation.
   Widget _compassCard(AppTheme theme, double heading) {
-    final cardinal = _cardinal(heading);
     return GlassContainer(
-      padding: EdgeInsets.all(20),
-      child: Column(
-        children: [
-          SizedBox(
-            width: 200,
-            height: 200,
-            child: _AnimatedCompass(heading: heading, theme: theme),
-          ),
-          SizedBox(height: 14),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: theme.primary.withAlpha(10),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: theme.primary.withAlpha(25)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.navigation, color: theme.accent, size: 18),
-                SizedBox(width: 8),
-                Text(
-                  '$cardinal • ${heading.toStringAsFixed(0)}°',
-                  style: TextStyle(
-                    color: theme.accent,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    fontFamily: 'monospace',
-                    letterSpacing: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+      padding: EdgeInsets.zero,
+      borderRadius: BorderRadius.circular(20),
+      bgColor: Colors.black,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: SizedBox(
+          height: 200,
+          width: double.infinity,
+          child: _LinearCompass(heading: heading),
+        ),
       ),
     );
   }
@@ -540,28 +520,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  static String _cardinal(double h) {
-    if (h < 22 || h >= 337) return 'N';
-    if (h < 67) return 'NE';
-    if (h < 112) return 'E';
-    if (h < 157) return 'SE';
-    if (h < 202) return 'S';
-    if (h < 247) return 'SW';
-    if (h < 292) return 'W';
-    return 'NW';
-  }
 }
 
-class _AnimatedCompass extends StatefulWidget {
+/// Faithful app-side reproduction of the device's linear scrolling compass
+/// (BenzCluster/compass.cpp): pure black bg, a horizontal WHITE scale with
+/// minor ticks every 15deg and cardinal/intercardinal labels every 45deg
+/// scrolling under a FIXED RED centre needle, plus a large white heading
+/// readout below. Deliberately black/white/red only — no theme colours — so
+/// this always looks exactly like what's on the physical gadget.
+class _LinearCompass extends StatefulWidget {
   final double heading;
-  final AppTheme theme;
-  const _AnimatedCompass({required this.heading, required this.theme});
+  const _LinearCompass({required this.heading});
 
   @override
-  State<_AnimatedCompass> createState() => _AnimatedCompassState();
+  State<_LinearCompass> createState() => _LinearCompassState();
 }
 
-class _AnimatedCompassState extends State<_AnimatedCompass> with SingleTickerProviderStateMixin {
+class _LinearCompassState extends State<_LinearCompass> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
   double _currentHeading = 0;
@@ -570,18 +545,20 @@ class _AnimatedCompassState extends State<_AnimatedCompass> with SingleTickerPro
   void initState() {
     super.initState();
     _currentHeading = widget.heading;
-    _controller = AnimationController(vsync: this, duration: Duration(milliseconds: 400));
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
     _animation = _controller.drive(Tween(begin: 0, end: 0));
     _controller.addListener(() => setState(() {}));
   }
 
   @override
-  void didUpdateWidget(_AnimatedCompass old) {
+  void didUpdateWidget(_LinearCompass old) {
     super.didUpdateWidget(old);
-    if ((old.heading - widget.heading).abs() > 0.5) {
+    if ((old.heading - widget.heading).abs() > 0.3) {
       final diff = widget.heading - _currentHeading;
-      _currentHeading += diff > 180 ? diff - 360 : (diff < -180 ? diff + 360 : diff);
-      _animation = _controller.drive(Tween(begin: _currentHeading - diff, end: _currentHeading));
+      final wrapped = diff > 180 ? diff - 360 : (diff < -180 ? diff + 360 : diff);
+      final target = _currentHeading + wrapped;
+      _animation = _controller.drive(Tween(begin: _currentHeading, end: target));
+      _currentHeading = target;
       _controller.reset();
       _controller.forward();
     }
@@ -596,85 +573,89 @@ class _AnimatedCompassState extends State<_AnimatedCompass> with SingleTickerPro
   @override
   Widget build(BuildContext context) {
     final heading = _controller.isAnimating ? _animation.value : widget.heading;
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Glow
-        Container(
-          width: 180,
-          height: 180,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(color: widget.theme.glow?.withAlpha(8) ?? Colors.transparent, blurRadius: 60, spreadRadius: 10),
-            ],
-          ),
-        ),
-        Transform.rotate(
-          angle: heading * math.pi / 180,
-          child: CustomPaint(
-            size: Size(200, 200),
-            painter: _CompassFacePainter(widget.theme),
-          ),
-        ),
-      ],
+    var h = heading % 360;
+    if (h < 0) h += 360;
+    return CustomPaint(
+      size: Size.infinite,
+      painter: _LinearCompassPainter(h),
     );
   }
 }
 
-class _CompassFacePainter extends CustomPainter {
-  final AppTheme theme;
-  _CompassFacePainter(this.theme);
+class _LinearCompassPainter extends CustomPainter {
+  static const _labels = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  final double heading;
+  _LinearCompassPainter(this.heading);
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2;
-    final outerR = radius * 0.92;
-    final innerR = radius * 0.82;
-
-    // Outer ring
-    canvas.drawCircle(center, outerR, Paint()..color = theme.surface);
-    canvas.drawCircle(center, outerR, Paint()..color = theme.cardBorder..style = PaintingStyle.stroke..strokeWidth = 2);
-    canvas.drawCircle(center, innerR, Paint()..color = theme.cardBorder.withAlpha(60)..style = PaintingStyle.stroke..strokeWidth = 1);
-
-    // Ticks
-    for (int deg = 0; deg < 360; deg += 15) {
-      final angle = deg * math.pi / 180;
-      final isCardinal = deg % 90 == 0;
-      final isMajor = deg % 45 == 0;
-      final tickLen = isCardinal ? outerR * 0.18 : (isMajor ? outerR * 0.12 : outerR * 0.07);
-      final outer = Offset(center.dx + math.cos(angle) * innerR, center.dy + math.sin(angle) * innerR);
-      final inner = Offset(center.dx + math.cos(angle) * (innerR - tickLen), center.dy + math.sin(angle) * (innerR - tickLen));
-      canvas.drawLine(
-        outer, inner,
-        Paint()
-          ..color = isCardinal ? theme.textPrimary : isMajor ? theme.textSecondary.withAlpha(150) : theme.textMuted.withAlpha(60)
-          ..strokeWidth = isCardinal ? 2.5 : (isMajor ? 1.5 : 1),
-      );
-
-      if (isCardinal) {
-        final label = deg == 0 ? 'N' : deg == 90 ? 'E' : deg == 180 ? 'S' : 'W';
-        final lr = innerR - tickLen - 18;
-        final lp = Offset(center.dx + math.cos(angle) * lr, center.dy + math.sin(angle) * lr);
-        final tp = TextPainter(
-          text: TextSpan(text: label, style: TextStyle(color: theme.primary, fontSize: 15, fontWeight: FontWeight.bold, letterSpacing: 0)),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        tp.paint(canvas, Offset(lp.dx - tp.width / 2, lp.dy - tp.height / 2));
-      }
-    }
-
-    // Needle
-    final needlePaint = Paint()..color = theme.accent..strokeWidth = 3..strokeCap = StrokeCap.round;
-    canvas.drawLine(center, Offset(center.dx, center.dy - innerR * 0.75), needlePaint);
-    canvas.drawCircle(center, innerR * 0.25, Paint()..color = theme.accent.withAlpha(15)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
-    canvas.drawCircle(center, 5, Paint()..color = theme.accent);
-    canvas.drawCircle(center, 2.5, Paint()..color = theme.surface);
+  double _angDiff(double a, double b) {
+    var d = a - b;
+    while (d > 180) d -= 360;
+    while (d <= -180) d += 360;
+    return d;
   }
 
   @override
-  bool shouldRepaint(_CompassFacePainter o) => o.theme != theme;
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(Offset.zero & size, Paint()..color = Colors.black);
+    final cx = size.width / 2;
+    final baseY = size.height * 0.32;
+    const pxPerDeg = 3.6; // wider on-screen than the 240px gadget, same ratio
+    final halfVis = size.width * 0.55;
+
+    // Minor ticks every 15deg, major (labelled) every 45deg.
+    for (int i = 0; i < 24; i++) {
+      final tickHdg = i * 15.0;
+      final d = _angDiff(tickHdg, heading);
+      final x = cx + d * pxPerDeg;
+      if ((x - cx).abs() > halfVis) continue;
+      final major = i % 3 == 0;
+      final h = major ? 26.0 : 14.0;
+      canvas.drawLine(
+        Offset(x, baseY),
+        Offset(x, baseY + h),
+        Paint()
+          ..color = Colors.white
+          ..strokeWidth = major ? 2.5 : 1.5,
+      );
+    }
+    for (int i = 0; i < 8; i++) {
+      final lblHdg = i * 45.0;
+      final d = _angDiff(lblHdg, heading);
+      final x = cx + d * pxPerDeg;
+      if ((x - cx).abs() > halfVis) continue;
+      final tp = TextPainter(
+        text: TextSpan(text: _labels[i], style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(x - tp.width / 2, baseY + 32));
+    }
+
+    // Fixed red centre needle.
+    canvas.drawLine(
+      Offset(cx, baseY - 10),
+      Offset(cx, baseY + 46),
+      Paint()
+        ..color = const Color(0xFFE01020)
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // Heading value + caption.
+    final valTp = TextPainter(
+      text: TextSpan(text: '${heading.round() % 360}', style: const TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w700)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    valTp.paint(canvas, Offset(cx - valTp.width / 2, baseY + 68));
+
+    final capTp = TextPainter(
+      text: const TextSpan(text: 'HEADING', style: TextStyle(color: Color(0xFF777777), fontSize: 12, letterSpacing: 1)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    capTp.paint(canvas, Offset(cx - capTp.width / 2, baseY + 68 + valTp.height + 4));
+  }
+
+  @override
+  bool shouldRepaint(_LinearCompassPainter old) => old.heading != heading;
 }
 
 class _GForceDialPainter extends CustomPainter {
