@@ -25,3 +25,6 @@ desktop.ini
 # LVGL simulator build + scratch renders
 simulator/build/
 simulator/shots/
+
+# Real WiFi/API credentials — never commit. Copy secrets.h.example instead.
+BenzCluster/secrets.h
