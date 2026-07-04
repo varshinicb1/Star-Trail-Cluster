@@ -4,65 +4,6 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/theme_provider.dart';
 
-class StarTrailLogoPainter extends CustomPainter {
-  final Color color;
-  final Color? glowColor;
-
-  StarTrailLogoPainter({required this.color, this.glowColor});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final r = math.min(size.width, size.height) / 2;
-    final outerR = r * 0.88;
-    final innerR = r * 0.50;
-
-    if (glowColor != null) {
-      canvas.drawCircle(
-        center,
-        outerR * 0.8,
-        Paint()
-          ..color = glowColor!.withAlpha(25)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
-      );
-    }
-
-    canvas.drawCircle(
-      center,
-      outerR,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8,
-    );
-
-    canvas.drawCircle(
-      center,
-      innerR,
-      Paint()
-        ..color = color.withAlpha(160)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2,
-    );
-
-    final starPaint = Paint()
-      ..color = color
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round;
-
-    for (int i = 0; i < 3; i++) {
-      final angle = -math.pi / 2 + i * 2 * math.pi / 3;
-      final dx = math.cos(angle) * innerR;
-      final dy = math.sin(angle) * innerR;
-      canvas.drawLine(center, Offset(center.dx + dx, center.dy + dy), starPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant StarTrailLogoPainter old) =>
-      old.color != color || old.glowColor != glowColor;
-}
-
 class IlluminatiLogoPainter extends CustomPainter {
   final Color color;
   final Color? glowColor;
@@ -122,82 +63,6 @@ class IlluminatiLogoPainter extends CustomPainter {
       old.color != color || old.glowColor != glowColor;
 }
 
-/// Premium brushed-chrome three-point star inside a dual ring — the flagship
-/// "Benz" emblem, brand-inspired (not the trademarked Mercedes logo).
-class BenzStarPainter extends CustomPainter {
-  final Color color;
-  final Color? glowColor;
-
-  BenzStarPainter({required this.color, this.glowColor});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final r = math.min(size.width, size.height) / 2;
-    final rOuter = r * 0.90;
-    final rInner = r * 0.62;
-
-    if (glowColor != null) {
-      canvas.drawCircle(
-        center,
-        rOuter,
-        Paint()
-          ..color = glowColor!.withAlpha(30)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
-      );
-    }
-
-    // dual concentric rings
-    canvas.drawCircle(
-      center,
-      rOuter,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = r * 0.05,
-    );
-    canvas.drawCircle(
-      center,
-      rInner,
-      Paint()
-        ..color = color.withAlpha(150)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = r * 0.03,
-    );
-
-    // three tapered wedges forming the tri-star
-    final fill = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final half = 12 * math.pi / 180;
-    for (int i = 0; i < 3; i++) {
-      final a = -math.pi / 2 + i * 2 * math.pi / 3;
-      final tip = Offset(center.dx + math.cos(a) * rInner, center.dy + math.sin(a) * rInner);
-      final l = Offset(
-        center.dx + math.cos(a - half) * rInner * 0.30,
-        center.dy + math.sin(a - half) * rInner * 0.30,
-      );
-      final rr = Offset(
-        center.dx + math.cos(a + half) * rInner * 0.30,
-        center.dy + math.sin(a + half) * rInner * 0.30,
-      );
-      final wedge = Path()
-        ..moveTo(tip.dx, tip.dy)
-        ..lineTo(l.dx, l.dy)
-        ..lineTo(center.dx, center.dy)
-        ..lineTo(rr.dx, rr.dy)
-        ..close();
-      canvas.drawPath(wedge, fill);
-    }
-    // centre hub
-    canvas.drawCircle(center, rInner * 0.14, fill);
-  }
-
-  @override
-  bool shouldRepaint(covariant BenzStarPainter old) =>
-      old.color != color || old.glowColor != glowColor;
-}
-
 class ThemeLogo extends StatelessWidget {
   final double size;
   final Color? color;
@@ -212,12 +77,12 @@ class ThemeLogo extends StatelessWidget {
     final logoColor = color ?? theme.primary;
     final glow = animate ? theme.glow : null;
 
-    // The Benz theme uses the real chrome emblem asset; the other themes use
-    // their vector painters.
+    // Star Trail (the merged premium theme) uses the real chrome emblem
+    // asset; Illuminati uses its vector painter.
     Widget child;
-    if (mode == AppThemeMode.benz) {
+    if (mode == AppThemeMode.starTrail) {
       child = SizedBox(
-        key: const ValueKey('benz-emblem'),
+        key: const ValueKey('star-trail-emblem'),
         width: size,
         height: size,
         child: DecoratedBox(
@@ -231,13 +96,10 @@ class ThemeLogo extends StatelessWidget {
         ),
       );
     } else {
-      final CustomPainter painter = mode == AppThemeMode.starTrail
-          ? StarTrailLogoPainter(color: logoColor, glowColor: glow)
-          : IlluminatiLogoPainter(color: logoColor, glowColor: glow);
       child = CustomPaint(
         key: ValueKey(mode),
         size: Size(size, size),
-        painter: painter,
+        painter: IlluminatiLogoPainter(color: logoColor, glowColor: glow),
       );
     }
 
