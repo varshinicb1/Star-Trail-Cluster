@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/widget_layout.dart';
+import '../models/widget_templates.dart';
 import '../painters/custom_widget_painter.dart';
 import '../providers/theme_provider.dart';
 import '../services/device_service.dart';
@@ -80,6 +81,56 @@ class _DesignerScreenState extends State<DesignerScreen>
     }
   }
 
+  Future<void> _pickTemplate() async {
+    final theme = context.read<ThemeProvider>().theme;
+    final chosen = await showModalBottomSheet<CwTemplate>(
+      context: context,
+      backgroundColor: theme.surface,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Text('Start from a built-in widget',
+                    style: TextStyle(color: theme.textPrimary, fontSize: 15, fontWeight: FontWeight.w700)),
+              ),
+              for (final t in cwTemplates)
+                ListTile(
+                  leading: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: ClipOval(
+                      child: DecoratedBox(
+                        decoration: const BoxDecoration(color: Colors.black),
+                        child: CustomPaint(
+                          painter: CustomWidgetPainter(layout: t.build(), values: _values),
+                        ),
+                      ),
+                    ),
+                  ),
+                  title: Text(t.name, style: TextStyle(color: theme.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                  subtitle: Text(t.description, style: TextStyle(color: theme.textMuted, fontSize: 11)),
+                  onTap: () => Navigator.of(sheetContext).pop(t),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (chosen == null || !mounted) return;
+    setState(() {
+      _layout = chosen.build();
+      _selected = _layout.elements.isNotEmpty ? _layout.elements.first : null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Loaded "${chosen.name}" template')),
+    );
+  }
+
   void _addElement(CwType type) {
     setState(() {
       final e = CwElement.defaultFor(type);
@@ -127,6 +178,11 @@ class _DesignerScreenState extends State<DesignerScreen>
       appBar: AppBar(
         title: const Text('Widget Designer'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.dashboard_customize_outlined),
+            tooltip: 'Templates',
+            onPressed: _pickTemplate,
+          ),
           IconButton(icon: const Icon(Icons.save_outlined), onPressed: _save),
           IconButton(
             icon: _pushing
