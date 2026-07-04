@@ -2,6 +2,31 @@
 
 A premium digital instrument cluster for the **CrowPanel 1.28" Round ESP32-S3 Display** — a complete automotive HUD replacement with a companion mobile app.
 
+## Screenshots
+
+### Firmware — LVGL PC simulator (`simulator/`)
+Rendered from the actual firmware widget code (not mockups) — see [`BenzCluster/docs/widgets/`](BenzCluster/docs/widgets/) and the [firmware README](BenzCluster/README.md#widget-preview) for the full breakdown.
+
+![Firmware widget gallery](BenzCluster/docs/widgets/_gallery.png)
+
+### Companion app — Android emulator (`star_trail_emu`)
+Captured live on a real Android emulator, not simulated screenshots — every screen shown is the actual installed release build (v2.0.2) running end to end, including a live call to the public GitHub API on the Updates screen.
+
+![App screenshot gallery](docs/screenshots/app_gallery.png)
+
+| Screen | Description |
+|--------|-------------|
+| [Welcome](docs/screenshots/01_welcome.png) | Theme picker (Star Trail chrome / Illuminati) + entry point |
+| [Dashboard](docs/screenshots/04_dashboard.png) | Live telemetry — linear compass matching the firmware widget exactly, alt/temp/pressure, G-force |
+| [Widget Designer](docs/screenshots/06_designer.png) | Drag-and-drop custom widget layout editor, pushes straight to the device |
+| [Controls](docs/screenshots/07_controls.png) | Device configuration menu |
+| [Attitude Style](docs/screenshots/08_attitude_style.png) | Pick the attitude-indicator face shown on the gadget, like a watch face |
+| [Factory Calibration](docs/screenshots/09_factory_cal.png) | One-time installer wizard — orientation zero + magnetometer figure-8 |
+| [LED Settings](docs/screenshots/11_led_settings.png) | Color, brightness, and pattern control for the 5 NeoPixels |
+| [System Settings](docs/screenshots/12_system_settings.png) | Display brightness, screen timeout, WiFi, device diagnostics |
+| [Updates (OTA)](docs/screenshots/13_ota.png) | One-tap firmware update straight from a GitHub release, plus app auto-update |
+| [Settings](docs/screenshots/14_config.png) | Connection (BLE/WiFi/Simulator), theme, and app info |
+
 ```
 ESP32-S3 (BenzCluster firmware)    ◄── BLE/WiFi ──►    Flutter App (star_trail)
 ├── 7 LVGL widgets on 240x240 GC9A01              ├── Real-time dashboard mirror
@@ -17,31 +42,33 @@ ESP32-S3 (BenzCluster firmware)    ◄── BLE/WiFi ──►    Flutter App (
 
 ### Hardware
 - **Display:** 1.28" round GC9A01 (240x240) SPI display
-- **Sensors:** MPU9250 (accelerometer + gyroscope + magnetometer), BME280 (temperature, humidity, pressure, altitude)
+- **Sensors:** MPU6050 (accelerometer + gyroscope), QMC5883L (magnetometer), BME280 (temperature, pressure, altitude)
 - **Input:** Rotary encoder with push button, capacitive touch (CST816D)
 - **Lighting:** 5 individually addressable NeoPixel LEDs
 - **Connectivity:** WiFi (ESP32-S3), BLE (NimBLE stack)
 
 ### Firmware (BenzCluster)
-- 7 swipeable LVGL widgets: **Clock, Compass, Attitude Indicator, Altitude/Temperature, G-Force, Music Remote, Airplane**
-- 3 clock faces (digital, analog, minimal)
-- ICAO-standard attitude indicator
+- 8 swipeable LVGL widgets: **Clock, Compass, Attitude Indicator, Altitude/Temperature, G-Force, Music Remote, Airplane, Custom**
+- Linear scrolling compass with true-north heading (tilt-compensated, hard/soft-iron corrected)
+- 4 selectable attitude-indicator styles (Classic ICAO, Fullscreen, Minimal, Tape/EFIS), switchable from the app like a watch face
+- One-time factory calibration (mount-tilt orientation zero + magnetometer figure-8) — end customers never calibrate
+- Custom widget designer: user-designed layouts pushed from the app render live on-device
 - BLE HID media control (play/pause/next/prev/volume)
-- BLE phone notification display
 - WiFi web dashboard with REST API on port 80
-- OTA firmware updates over WiFi
+- OTA firmware updates over WiFi (pushed automatically from the app, or manual .bin upload)
 - Rotary encoder for brightness, volume, widget navigation
 - 3-second encoder hold for system overlay (sensor viewer, system info, calibration)
 
 ### Companion App (star_trail)
-- Real-time dashboard mirror with animated gauges
-- 3 themes: **Star Trail** (Mercedes cyan/blue), **Illuminati** (VW red), **DR** (personal purple)
-- Glassmorphism UI with premium automotive HUD aesthetic
+- Real-time dashboard mirror — widgets match the firmware exactly (same linear compass, same colours)
+- 2 themes: **Star Trail** (premium black/gunmetal/chrome, real Mercedes emblem, default), **Illuminati** (VW red)
+- Drag-and-drop widget designer that pushes custom layouts straight to the device
+- Attitude style picker and factory calibration wizard
 - Widget configuration (enable/disable, reorder, swipe direction, knob mode)
 - LED control (color picker, patterns, brightness, speed)
 - System settings (display brightness, screen timeout, WiFi config, device info)
-- OTA firmware update upload (file picker + progress bar)
-- Auto-update via GitHub Releases (checks for new APK versions, downloads & installs)
+- One-tap firmware update straight from a GitHub release (manual .bin upload kept as a fallback)
+- App auto-update via GitHub Releases (checks for new APK versions, downloads & installs)
 - Connection via BLE scan, WiFi IP, or built-in simulator mode
 
 ## Quick Start
@@ -155,29 +182,30 @@ arduino-cli compile --fqbn esp32:esp32:esp32s3 --partitions-scheme huge_app Benz
 **Flutter APK**
 ```bash
 cd flutter_app/
-flutter build apk --release --build-name=1.0.1 --build-number=2
+flutter build apk --release --build-name=2.0.2 --build-number=5
 ```
 
-Release APK: `flutter_app/build/app/outputs/flutter-apk/app-release.apk` (50.7MB)
+Release APK: `flutter_app/build/app/outputs/flutter-apk/app-release.apk` (~54.7MB)
 Debug APK: `flutter_app/build/app/outputs/flutter-apk/app-debug.apk`
 
 ### Creating a GitHub Release
 1. Build firmware and APK (commands above)
-2. Create a GitHub Release with tag `v1.0.1` (match `--build-name`)
-3. Upload `app-release.apk` as a release asset
-4. Set `GITHUB_REPO=edgehax/star_trail` in `lib/services/update_service.dart` (update to your repo)
-5. Users' apps auto-detect the new version on next launch
+2. Create a GitHub Release with tag `vX.Y.Z` (match `--build-name`), **repo must be public** — GitHub's REST API returns 404 for unauthenticated release lookups on private repos, which silently breaks both the app and firmware auto-update
+3. Upload `app-release.apk` AND the firmware `.bin` as release assets — the app derives both the app update and the firmware update from the same release
+4. `githubRepo` in `lib/services/update_service.dart` already points at this repo
+5. Users' apps auto-detect the new app version on next launch; the Updates screen offers one-tap firmware push whenever a new `.bin` is published
 
 ### Auto-Update Flow
-- `UpdateService` checks GitHub API for latest release on app launch
-- Compares versions semantically against installed app version
-- If newer, downloads APK to temp directory and opens via Android FileProvider
-- Requires Android 7+ (FileProvider for secure APK install)
+- `UpdateService` checks the GitHub Releases API once per launch, deriving both app-APK and firmware-.bin info from the same release
+- Compares versions semantically against the installed app version
+- App: downloads the APK to temp storage and opens it via Android FileProvider (requires Android 7+)
+- Firmware: downloads the `.bin` into memory and pushes it to the device over WiFi automatically (`POST /update`) — no manual file picking required; manual upload remains as a fallback
 
 ### Verification
 - `flutter analyze` — 0 issues
-- `flutter test` — 19 tests pass
-- Firmware: ESP32-S3 Huge APP partition, ~57% flash usage
+- `flutter test` — 23 tests pass
+- Firmware: compiles to ~2.03MB (64% of the 3MB app partition)
+- Verified live: LVGL PC simulator (all 10 widget screens) + a real Android emulator (all app screens, including a live GitHub API round-trip on the Updates screen) — see Screenshots above
 
 ## License
 
